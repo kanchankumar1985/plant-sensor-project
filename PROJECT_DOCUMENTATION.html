@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌱 Plant Sensor IoT System - Complete Documentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h2 {
+            color: #4a5568;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        
+        .architecture-flow {
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            background: #f7fafc;
+            padding: 30px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .flow-step {
+            background: #667eea;
+            color: white;
+            padding: 15px 25px;
+            margin: 10px;
+            border-radius: 25px;
+            display: inline-block;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .arrow {
+            font-size: 2em;
+            color: #667eea;
+            margin: 10px;
+        }
+        
+        .component {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 0 10px 10px 0;
+        }
+        
+        .component h3 {
+            color: #28a745;
+            margin-bottom: 10px;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        
+        .command {
+            background: #1a202c;
+            color: #68d391;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .tech-item {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .tech-item h4 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+        
+        .pin-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .pin-table th, .pin-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .pin-table th {
+            background: #667eea;
+            color: white;
+        }
+        
+        .pin-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #28a745;
+            margin-right: 8px;
+        }
+        
+        .flow-diagram {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .layer {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            font-weight: bold;
+            position: relative;
+        }
+        
+        .layer::after {
+            content: '↓';
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            color: #667eea;
+        }
+        
+        .layer:last-child::after {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌱 Plant Sensor IoT System</h1>
+            <p>Complete USB-Based Plant Monitoring Platform</p>
+            <p><span class="status-indicator"></span>System Status: OPERATIONAL</p>
+        </div>
+
+        <!-- System Architecture -->
+        <div class="card">
+            <h2>🏗️ System Architecture</h2>
+            <div class="flow-diagram">
+                <div class="layer">HDC302x Sensor (Temperature & Humidity)</div>
+                <div class="layer">ESP32 Microcontroller</div>
+                <div class="layer">USB Serial Communication</div>
+                <div class="layer">Python Ingestion Script</div>
+                <div class="layer">🐳 Docker Container (TimescaleDB)</div>
+                <div class="layer">FastAPI Backend</div>
+                <div class="layer">React Dashboard</div>
+            </div>
+        </div>
+
+
+        <!-- Hardware Components -->
+        <div class="card">
+            <h2>🔌 Hardware Components</h2>
+            
+            <div class="component">
+                <h3>HDC302x Temperature & Humidity Sensor</h3>
+                <p><strong>Purpose:</strong> Measures environmental conditions</p>
+                <p><strong>Communication:</strong> I2C Protocol</p>
+                <p><strong>Accuracy:</strong> ±0.2°C, ±2% RH</p>
+                
+                <h4>Pin Connections:</h4>
+                <table class="pin-table">
+                    <tr><th>Sensor Pin</th><th>ESP32 Pin</th><th>Purpose</th></tr>
+                    <tr><td>VIN</td><td>3.3V</td><td>Power Supply</td></tr>
+                    <tr><td>GND</td><td>GND</td><td>Ground</td></tr>
+                    <tr><td>SDA</td><td>GPIO21</td><td>I2C Data Line</td></tr>
+                    <tr><td>SCL</td><td>GPIO22</td><td>I2C Clock Line</td></tr>
+                </table>
+            </div>
+
+            <div class="component">
+                <h3>ESP32 Microcontroller</h3>
+                <p><strong>Purpose:</strong> Read sensor data and transmit via USB</p>
+                <p><strong>Features:</strong> WiFi/Bluetooth capable, 32-bit processor</p>
+                <p><strong>Communication:</strong> USB Serial (115200 baud)</p>
+                
+                <div class="code-block">
+// ESP32 Code Structure
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(21, 22);  // I2C pins
+  hdc.begin(0x44, &Wire);
+  hdc.setAutoMode(AUTO_MEASUREMENT_1MPS_LP0);
+}
+
+void loop() {
+  if (hdc.readAutoTempRH(temp, hum)) {
+    Serial.print("{\"device_id\":\"plant-esp32-01\",");
+    Serial.print("\"temperature_c\":");
+    Serial.print(temp, 2);
+    Serial.print(",\"humidity_pct\":");
+    Serial.print(hum, 2);
+    Serial.println("}");
+  }
+  delay(2000);
+}
+                </div>
+            </div>
+        </div>
+
+        <!-- Software Stack -->
+        <div class="card">
+            <h2>💻 Software Stack</h2>
+            
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <h4>🐍 Python</h4>
+                    <p>Serial data ingestion</p>
+                    <p>Database operations</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🗄️ TimescaleDB</h4>
+                    <p>Time-series database</p>
+                    <p>PostgreSQL extension</p>
+                </div>
+                <div class="tech-item">
+                    <h4>⚡ FastAPI</h4>
+                    <p>REST API backend</p>
+                    <p>Real-time data serving</p>
+                </div>
+                <div class="tech-item">
+                    <h4>⚛️ React</h4>
+                    <p>Interactive dashboard</p>
+                    <p>Data visualization</p>
+                </div>
+            </div>
+
+            <div class="component">
+                <h3>Python Serial Reader</h3>
+                <p><strong>File:</strong> <code>serial_reader.py</code></p>
+                <p><strong>Purpose:</strong> Bridge between ESP32 and database</p>
+                
+                <div class="code-block">
+# Key Functions
+def connect_serial():
+    ser = serial.Serial('/dev/cu.usbserial-0001', 115200)
+    return ser
+
+def parse_sensor_data(line):
+    data = json.loads(line.strip())
+    return data if all(key in data for key in 
+                      ['device_id', 'temperature_c', 'humidity_pct']) else None
+
+def insert_sensor_data(conn, data):
+    cur.execute("""
+        INSERT INTO sensor_readings (time, device_id, temperature_c, humidity_pct)
+        VALUES (NOW(), %s, %s, %s)
+    """, (data['device_id'], data['temperature_c'], data['humidity_pct']))
+                </div>
+            </div>
+
+            <div class="component">
+                <h3>🐳 Docker Container (TimescaleDB) - Layer 5</h3>
+                <p><strong>What is Docker?</strong> Containerization platform that packages TimescaleDB and its dependencies into a portable container.</p>
+                
+                <h4>🎯 Why Docker for Database Layer?</h4>
+                <ul style="margin: 15px 0; padding-left: 20px;">
+                    <li><strong>Consistency:</strong> Same database environment on any machine</li>
+                    <li><strong>Isolation:</strong> Database runs separately from your system</li>
+                    <li><strong>Easy Setup:</strong> One command installs entire TimescaleDB</li>
+                    <li><strong>No Conflicts:</strong> Doesn't interfere with existing PostgreSQL installations</li>
+                    <li><strong>Version Control:</strong> Specific TimescaleDB version guaranteed</li>
+                </ul>
+
+                <h4>🔧 Container Configuration:</h4>
+                <table class="pin-table">
+                    <tr><th>Component</th><th>Value</th><th>Purpose</th></tr>
+                    <tr><td>Image</td><td>timescale/timescaledb:latest-pg14</td><td>Pre-built TimescaleDB with PostgreSQL 14</td></tr>
+                    <tr><td>Container Name</td><td>timescaledb</td><td>Easy reference for management</td></tr>
+                    <tr><td>Host Port</td><td>5433</td><td>External access port (avoids conflicts)</td></tr>
+                    <tr><td>Container Port</td><td>5432</td><td>Standard PostgreSQL port inside container</td></tr>
+                </table>
+
+                <div class="code-block">
+# Docker Command (Layer 5 Setup)
+docker run -d \
+  --name timescaledb \           # Container name for easy reference
+  -p 5433:5432 \                # Port mapping: host:container
+  -e POSTGRES_PASSWORD=plantpass \ # Environment variable for DB password
+  timescale/timescaledb:latest-pg14  # Docker image with TimescaleDB
+
+# Container Management
+docker ps                      # Check if running
+docker stop timescaledb       # Stop container
+docker start timescaledb      # Start container
+docker logs timescaledb       # View logs
+                </div>
+
+                <h4>💾 Data Persistence:</h4>
+                <p>Docker volumes ensure your sensor data survives container restarts and system reboots.</p>
+                <div class="code-block">
+# Backup data
+docker exec timescaledb pg_dump -U postgres plantdb > backup.sql
+
+# Restore data
+docker exec -i timescaledb psql -U postgres plantdb < backup.sql
+                </div>
+            </div>
+
+            <div class="component">
+                <h3>TimescaleDB Schema</h3>
+                <div class="code-block">
+CREATE TABLE sensor_readings (
+    time TIMESTAMPTZ NOT NULL,
+    device_id TEXT NOT NULL,
+    temperature_c REAL NOT NULL,
+    humidity_pct REAL NOT NULL
+);
+
+SELECT create_hypertable('sensor_readings', 'time');
+                </div>
+            </div>
+
+            <div class="component">
+                <h3>FastAPI Endpoints</h3>
+                <div class="code-block">
+# API Endpoints
+GET /api/readings/latest          # Latest sensor reading
+GET /api/readings/recent?limit=30 # Recent readings
+GET /api/readings/range           # Time range queries
+    ?start_time=2026-04-04T10:00:00.000Z
+    &end_time=2026-04-04T12:00:00.000Z
+                </div>
+            </div>
+        </div>
+
+        <!-- Setup Commands -->
+        <div class="card">
+            <h2>🚀 Setup & Run Commands</h2>
+            
+            <h3>1. Database Setup</h3>
+            <div class="command">docker run -d --name timescaledb -p 5433:5432 -e POSTGRES_PASSWORD=plantpass timescale/timescaledb:latest-pg14</div>
+            <div class="command">psql -h localhost -p 5433 -U postgres -d postgres -c "CREATE DATABASE plantdb;"</div>
+            <div class="command">psql -h localhost -p 5433 -U postgres -d plantdb -c "CREATE USER plantuser WITH PASSWORD 'plantpass';"</div>
+            
+            <h3>2. Backend Setup</h3>
+            <div class="command">cd plant-monitor/backend</div>
+            <div class="command">python3 -m venv .venv</div>
+            <div class="command">source .venv/bin/activate</div>
+            <div class="command">pip install fastapi uvicorn psycopg2-binary pyserial python-dotenv</div>
+            
+            <h3>3. Frontend Setup</h3>
+            <div class="command">cd plant-monitor/frontend</div>
+            <div class="command">npm install</div>
+            <div class="command">npm install recharts</div>
+            
+            <h3>4. Run System</h3>
+            <div class="command"># Terminal 1: Start serial reader</div>
+            <div class="command">cd plant-monitor/backend && source .venv/bin/activate && python3 serial_reader.py</div>
+            
+            <div class="command"># Terminal 2: Start API server</div>
+            <div class="command">cd plant-monitor/backend && source .venv/bin/activate && uvicorn app:app --reload</div>
+            
+            <div class="command"># Terminal 3: Start React dashboard</div>
+            <div class="command">cd plant-monitor/frontend && npm run dev</div>
+        </div>
+
+        <!-- Data Flow -->
+        <div class="card">
+            <h2>🔄 Data Flow Process</h2>
+            
+            <div class="architecture-flow">
+                <div class="flow-step">Sensor Reading</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">I2C Communication</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">ESP32 Processing</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">JSON Serialization</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">USB Serial Output</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">Python Ingestion</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">Database Storage</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">API Serving</div>
+                <div class="arrow">↓</div>
+                <div class="flow-step">React Visualization</div>
+            </div>
+
+            <h3>Sample Data Flow:</h3>
+            <div class="code-block">
+1. HDC302x → 26.77°C, 61.3% RH
+2. ESP32 → {"device_id":"plant-esp32-01","temperature_c":26.77,"humidity_pct":61.3}
+3. Python → INSERT INTO sensor_readings VALUES (NOW(), 'plant-esp32-01', 26.77, 61.3)
+4. FastAPI → GET /api/readings/latest → {"time":"2026-04-04T15:56:49Z",...}
+5. React → Live chart update every 3 seconds
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="card">
+            <h2>✨ Dashboard Features</h2>
+            
+            <div class="component">
+                <h3>Live Data Mode</h3>
+                <p>• Auto-refresh every 3 seconds</p>
+                <p>• Real-time temperature and humidity display</p>
+                <p>• Live status indicator</p>
+            </div>
+
+            <div class="component">
+                <h3>Historical Data Analysis</h3>
+                <p>• Quick presets: Last 5 min, 15 min, 1 hour, Today</p>
+                <p>• Custom date/time range selection</p>
+                <p>• Visual selection indicators</p>
+                <p>• Timezone-aware filtering</p>
+            </div>
+
+            <div class="component">
+                <h3>Data Visualization</h3>
+                <p>• Dual-axis line charts</p>
+                <p>• Color-coded legends (Red: Temperature, Teal: Humidity)</p>
+                <p>• Interactive tooltips</p>
+                <p>• Responsive design</p>
+            </div>
+        </div>
+
+        <!-- Troubleshooting -->
+        <div class="card">
+            <h2>🔧 Troubleshooting</h2>
+            
+            <div class="component">
+                <h3>Check Serial Connection</h3>
+                <div class="command">ls /dev/cu* | grep usbserial</div>
+                <div class="command">ps aux | grep serial_reader</div>
+            </div>
+
+            <div class="component">
+                <h3>Test API Endpoints</h3>
+                <div class="command">curl http://localhost:8000/api/readings/latest</div>
+                <div class="command">curl http://localhost:8000/api/readings/recent?limit=5</div>
+            </div>
+
+            <div class="component">
+                <h3>Database Connection</h3>
+                <div class="command">psql -h localhost -p 5433 -U plantuser -d plantdb -c "SELECT COUNT(*) FROM sensor_readings;"</div>
+            </div>
+        </div>
+
+        <!-- Next Steps -->
+        <div class="card">
+            <h2>🚀 Next Level Upgrades</h2>
+            
+            <div class="tech-stack">
+                <div class="tech-item">
+                    <h4>📡 WiFi Mode</h4>
+                    <p>Wireless ESP32 operation</p>
+                    <p>HTTP POST to API</p>
+                </div>
+                <div class="tech-item">
+                    <h4>☁️ Cloud Deploy</h4>
+                    <p>AWS/Heroku hosting</p>
+                    <p>Remote monitoring</p>
+                </div>
+                <div class="tech-item">
+                    <h4>📱 Mobile App</h4>
+                    <p>React Native</p>
+                    <p>Push notifications</p>
+                </div>
+                <div class="tech-item">
+                    <h4>🌱 More Sensors</h4>
+                    <p>Soil moisture</p>
+                    <p>Light levels</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="header" style="margin-top: 40px;">
+            <p>🎉 Congratulations! You've built a complete IoT data platform!</p>
+            <p style="font-size: 0.9em; opacity: 0.8;">Generated on April 4, 2026 • System Status: Fully Operational</p>
+        </div>
+    </div>
+</body>
+</html>
