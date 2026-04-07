@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 """
-YOLO-based person detection for plant monitoring
-Detects people in webcam images before plant analysis
+Person detection using YOLOv8n (nano) model
+Detects people in images and saves metadata + boxed images
 """
 
+import os
 import json
-import cv2
 from pathlib import Path
 from ultralytics import YOLO
+import cv2
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Image storage configuration
+IMAGES_DIR = Path(os.getenv('IMAGES_DIR', str(Path(__file__).parent / "images")))
+
+# Image compression settings
+IMAGE_JPEG_QUALITY = int(os.getenv('IMAGE_JPEG_QUALITY', '85'))  # 0-100, higher = better quality but larger file
 
 # Load lightweight YOLO model (YOLOv8n - nano version)
 MODEL = None
@@ -93,7 +103,7 @@ def save_metadata_json(image_path, metadata):
     """
     try:
         image_path = Path(image_path)
-        json_path = image_path.parent / f"{image_path.stem}_detection.json"
+        json_path = IMAGES_DIR / f"{image_path.stem}_detection.json"
         
         with open(json_path, 'w') as f:
             json.dump(metadata, f, indent=2)
@@ -118,7 +128,7 @@ def draw_boxes_and_save(image_path, metadata):
     """
     try:
         image_path = Path(image_path)
-        boxed_path = image_path.parent / f"{image_path.stem}_boxed{image_path.suffix}"
+        boxed_path = IMAGES_DIR / f"{image_path.stem}_boxed{image_path.suffix}"
         
         # Read image
         img = cv2.imread(str(image_path))
@@ -150,9 +160,12 @@ def draw_boxes_and_save(image_path, metadata):
             cv2.putText(img, label, (x1, y1 - 5), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         
-        # Save boxed image
-        cv2.imwrite(str(boxed_path), img)
-        print(f"✓ Boxed image saved: {boxed_path.name}")
+        # Save boxed image with JPEG compression
+        cv2.imwrite(str(boxed_path), img, [cv2.IMWRITE_JPEG_QUALITY, IMAGE_JPEG_QUALITY])
+        
+        # Show file size
+        file_size_kb = boxed_path.stat().st_size / 1024
+        print(f"✓ Boxed image saved: {boxed_path.name} ({file_size_kb:.1f} KB)")
         
         return str(boxed_path)
         
