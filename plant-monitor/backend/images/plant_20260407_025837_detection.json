@@ -1,0 +1,16 @@
+{
+  "person_detected": true,
+  "person_count": 1,
+  "detections": [
+    {
+      "class_name": "person",
+      "confidence": 0.9243687987327576,
+      "bbox_xyxy": [
+        0.0,
+        146.8663330078125,
+        1120.1143798828125,
+        1073.435302734375
+      ]
+    }
+  ]
+}

@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS sensor_readings (
     time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     device_id TEXT NOT NULL,
     temperature_c DOUBLE PRECISION NOT NULL,
-    humidity_pct DOUBLE PRECISION NOT NULL
+    humidity_pct DOUBLE PRECISION NOT NULL,
+    led_state INTEGER DEFAULT 0
 );
 
 SELECT create_hypertable('sensor_readings', by_range('time'), if_not_exists => TRUE);

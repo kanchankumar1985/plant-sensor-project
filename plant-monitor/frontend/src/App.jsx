@@ -9,6 +9,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import PlantSnapshot from "./PlantSnapshot";
+import SnapshotGrid from "./SnapshotGrid";
+import PersonDetection from "./PersonDetection";
 
 const API_BASE = "http://localhost:8000";
 
@@ -292,7 +295,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ width: "100%", height: 420, background: "#fff", padding: 16, borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,0.08)" }}>
+      <div style={{ width: "100%", height: 420, background: "#fff", padding: 16, borderRadius: 12, boxShadow: "0 2px 10px rgba(0,0,0,0.08)", marginBottom: 24 }}>
         <h3>Live Readings</h3>
         <ResponsiveContainer width="100%" height="90%">
           <LineChart data={recent}>
@@ -307,6 +310,15 @@ export default function App() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Plant Snapshot Section */}
+      <PlantSnapshot />
+
+      {/* Person Detection Section */}
+      <PersonDetection />
+
+      {/* Snapshot Grid Gallery */}
+      <SnapshotGrid />
     </div>
   );
 }
