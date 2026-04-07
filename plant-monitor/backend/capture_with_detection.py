@@ -2,6 +2,7 @@
 """
 Integrated capture pipeline with person detection
 Captures image → runs YOLO detection → saves to database
+Optionally records video alert when temperature threshold is exceeded
 """
 
 import json
@@ -10,6 +11,7 @@ from pathlib import Path
 from datetime import datetime
 from detect_person import process_image_for_person_detection
 from capture_snapshot import capture_webcam_image, run_vlm
+from capture_video import record_video_alert
 
 # Database configuration
 DB_CONFIG = {
@@ -29,7 +31,7 @@ def connect_database():
         print(f"❌ Database connection failed: {e}")
         return None
 
-def insert_snapshot_with_detection(conn, image_filename, sensor_data, detection_result, vlm_result=None, sensor_timestamp=None):
+def insert_snapshot_with_detection(conn, image_filename, sensor_data, detection_result, vlm_result=None, sensor_timestamp=None, video_filename=None):
     """
     Insert snapshot with person detection metadata into database
     
@@ -40,6 +42,7 @@ def insert_snapshot_with_detection(conn, image_filename, sensor_data, detection_
         detection_result: Dict with metadata, json_path, boxed_image_path
         vlm_result: Optional VLM analysis result
         sensor_timestamp: Optional exact timestamp from sensor_readings
+        video_filename: Optional video clip filename
         
     Returns:
         bool: Success status
@@ -55,8 +58,8 @@ def insert_snapshot_with_detection(conn, image_filename, sensor_data, detection_
             insert_query = """
             INSERT INTO plant_snapshots 
             (time, image_path, temperature_c, humidity_pct, led_state, vlm_result,
-             person_detected, person_count, detection_metadata, boxed_image_path)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             person_detected, person_count, detection_metadata, boxed_image_path, video_path)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING time
             """
             
@@ -70,15 +73,16 @@ def insert_snapshot_with_detection(conn, image_filename, sensor_data, detection_
                 metadata['person_detected'],
                 metadata['person_count'],
                 json.dumps(metadata),
-                boxed_image_path
+                boxed_image_path,
+                video_filename
             ))
         else:
             # Use NOW() for manual captures
             insert_query = """
             INSERT INTO plant_snapshots 
             (time, image_path, temperature_c, humidity_pct, led_state, vlm_result,
-             person_detected, person_count, detection_metadata, boxed_image_path)
-            VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             person_detected, person_count, detection_metadata, boxed_image_path, video_path)
+            VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING time
             """
             
@@ -91,7 +95,8 @@ def insert_snapshot_with_detection(conn, image_filename, sensor_data, detection_
                 metadata['person_detected'],
                 metadata['person_count'],
                 json.dumps(metadata),
-                boxed_image_path
+                boxed_image_path,
+                video_filename
             ))
         
         timestamp = cur.fetchone()[0]
@@ -163,20 +168,31 @@ def capture_and_detect(sensor_data=None, db_conn=None, sensor_timestamp=None):
                     'led_state': False
                 }
         
-        # Step 5: Insert to database
+        # Step 5: Record video alert if temperature is high (≥25°C)
+        video_filename = None
+        if sensor_data['temperature_c'] >= 25.0:
+            print(f"🔥 Temperature alert: {sensor_data['temperature_c']}°C ≥ 25°C")
+            video_filename = record_video_alert()
+            if video_filename:
+                print(f"   📹 Video alert recorded: {video_filename}")
+        
+        # Step 6: Insert to database
         success = insert_snapshot_with_detection(
             db_conn, 
             image_filename, 
             sensor_data, 
             detection_result, 
             vlm_result,
-            sensor_timestamp
+            sensor_timestamp,
+            video_filename
         )
         
         if success:
             print(f"\n✅ Capture with detection complete!")
             print(f"   📸 Image: {image_filename}")
             print(f"   🖼️  Boxed: {Path(detection_result['boxed_image_path']).name if detection_result['boxed_image_path'] else 'N/A'}")
+            if video_filename:
+                print(f"   📹 Video: {video_filename}")
             print(f"   👤 Person detected: {detection_result['metadata']['person_detected']}")
             print(f"   👥 Person count: {detection_result['metadata']['person_count']}")
             print(f"   🌡️  Temp: {sensor_data['temperature_c']}°C")

@@ -5,10 +5,11 @@ const SnapshotGrid = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+  const [videoError, setVideoError] = useState(false);
 
   const fetchSnapshots = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/snapshots/recent?limit=20');
+      const response = await fetch('http://localhost:8000/api/snapshots/recent?limit=10000');
       if (!response.ok) {
         throw new Error('Failed to fetch snapshots');
       }
@@ -75,14 +76,50 @@ const SnapshotGrid = () => {
           >
             {/* Image */}
             <div style={styles.imageContainer}>
-              <img 
-                src={snapshot.image_url} 
-                alt={`Plant snapshot ${index + 1}`}
-                style={styles.image}
-                onError={(e) => {
-                  e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect fill="%23ddd" width="300" height="200"/><text x="50%" y="50%" text-anchor="middle" fill="%23999">Image not available</text></svg>';
-                }}
-              />
+              <div style={{position:'relative', width:'100%', height:'180px'}}>
+                <img 
+                  src={snapshot.image_url} 
+                  alt={`Plant snapshot ${index + 1}`}
+                  style={styles.image}
+                  onError={(e) => {
+                    e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect fill="%23ddd" width="300" height="200"/><text x="50%" y="50%" text-anchor="middle" fill="%23999">Image not available</text></svg>';
+                  }}
+                />
+                {/* SVG overlay for bounding boxes in thumbnail */}
+                {snapshot.detection_metadata && snapshot.detection_metadata.detections && snapshot.detection_metadata.detections.length > 0 && (
+                  <svg
+                    style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none'}}
+                    viewBox={`0 0 1280 900`} // adjust as needed
+                  >
+                    {snapshot.detection_metadata.detections.map((det, idx) => {
+                      const [x1, y1, x2, y2] = det.bbox_xyxy;
+                      return (
+                        <g key={idx}>
+                          <rect 
+                            x={x1/4} y={y1/2.8} 
+                            width={(x2-x1)/4} height={(y2-y1)/2.8} 
+                            fill="none" 
+                            stroke="#f59e0b" 
+                            strokeWidth="2"
+                            rx="4"
+                          />
+                          <text x={x1/4+4} y={Math.max(y1/2.8-8,16)} fill="#f59e0b" fontSize="14" fontWeight="bold" stroke="#fff" strokeWidth="1" paintOrder="stroke" >
+                            {`Person ${(det.confidence*100).toFixed(1)}%`}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                )}
+                
+                {/* Video indicator badge */}
+                {snapshot.video_url && (
+                  <div style={styles.videoBadge}>
+                    <span style={styles.videoBadgeIcon}>📹</span>
+                    <span style={styles.videoBadgeText}>Video</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Metadata */}
@@ -115,7 +152,26 @@ const SnapshotGrid = () => {
               {snapshot.vlm_result && snapshot.vlm_result !== 'Not analyzed yet' && (
                 <div style={styles.vlmResult}>
                   <span style={styles.vlmIcon}>🤖</span>
-                  <span style={styles.vlmText}>{snapshot.vlm_result}</span>
+                  <span style={styles.vlmText}>
+                    {snapshot.vlm_result}
+                    {/* Show confidence if analysis was skipped due to person detection */}
+                    {snapshot.vlm_result.startsWith('Skipped: Person detected') && snapshot.detection_metadata && snapshot.detection_metadata.detections && snapshot.detection_metadata.detections.length > 0 && (
+                      <>
+                        <br/>
+                        <span style={{color:'#f59e0b', fontWeight:'bold'}}>
+                          Confidence: {(snapshot.detection_metadata.detections[0].confidence * 100).toFixed(1)}%
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
+              
+              {/* Video available indicator */}
+              {snapshot.video_url && (
+                <div style={styles.videoIndicator}>
+                  <span style={styles.videoIndicatorIcon}>🎬</span>
+                  <span style={styles.videoIndicatorText}>Video clip available - Click to watch</span>
                 </div>
               )}
             </div>
@@ -125,22 +181,76 @@ const SnapshotGrid = () => {
 
       {/* Modal */}
       {selectedSnapshot && (
-        <div style={styles.modalOverlay} onClick={() => setSelectedSnapshot(null)}>
+        <div style={styles.modalOverlay} onClick={() => {
+          setSelectedSnapshot(null);
+          setVideoError(false);
+        }}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <button 
               style={styles.closeButton}
-              onClick={() => setSelectedSnapshot(null)}
+              onClick={() => {
+                setSelectedSnapshot(null);
+                setVideoError(false);
+              }}
             >
               ✕
             </button>
 
-            <div style={styles.modalImageContainer}>
-              <img 
-                src={selectedSnapshot.image_url} 
-                alt="Plant snapshot detail"
-                style={styles.modalImage}
-              />
-            </div>
+            {/* Video Player in Modal - Replaces Image */}
+            {selectedSnapshot.video_url && !videoError ? (
+              <div style={styles.modalVideoContainer}>
+                <video 
+                  controls 
+                  autoPlay
+                  preload="auto"
+                  style={styles.modalVideo}
+                  key={selectedSnapshot.video_url}
+                  onError={(e) => {
+                    console.error('Video failed to load:', selectedSnapshot.video_url);
+                    setVideoError(true);
+                  }}
+                >
+                  <source src={selectedSnapshot.video_url} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            ) : (
+              <div style={styles.modalImageContainer}>
+                <div style={{position:'relative', width:'100%', height:'900px'}}>
+                  <img 
+                    src={selectedSnapshot.image_url} 
+                    alt="Plant snapshot detail"
+                    style={styles.modalImage}
+                  />
+                  {/* SVG overlay for bounding boxes in modal */}
+                  {selectedSnapshot.detection_metadata && selectedSnapshot.detection_metadata.detections && selectedSnapshot.detection_metadata.detections.length > 0 && (
+                    <svg
+                      style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none'}}
+                      viewBox={`0 0 1280 900`} // adjust as needed
+                    >
+                      {selectedSnapshot.detection_metadata.detections.map((det, idx) => {
+                        const [x1, y1, x2, y2] = det.bbox_xyxy;
+                        return (
+                          <g key={idx}>
+                            <rect 
+                              x={x1} y={y1} 
+                              width={x2-x1} height={y2-y1} 
+                              fill="none" 
+                              stroke="#f59e0b" 
+                              strokeWidth="4"
+                              rx="8"
+                            />
+                            <text x={x1+8} y={y1+28} fill="#f59e0b" fontSize="32" fontWeight="bold" stroke="#fff" strokeWidth="2" paintOrder="stroke" >
+                              {`Person ${(det.confidence*100).toFixed(1)}%`}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div style={styles.modalDetails}>
               <h3 style={styles.modalTitle}>📸 Snapshot Details</h3>
@@ -182,7 +292,18 @@ const SnapshotGrid = () => {
               {selectedSnapshot.vlm_result && (
                 <div style={styles.modalVlmSection}>
                   <span style={styles.modalLabel}>🤖 AI Analysis:</span>
-                  <p style={styles.modalVlmText}>{selectedSnapshot.vlm_result}</p>
+                  <p style={styles.modalVlmText}>
+                    {selectedSnapshot.vlm_result}
+                    {/* Show confidence if analysis was skipped due to person detection */}
+                    {selectedSnapshot.vlm_result.startsWith('Skipped: Person detected') && selectedSnapshot.detection_metadata && selectedSnapshot.detection_metadata.detections && selectedSnapshot.detection_metadata.detections.length > 0 && (
+                      <>
+                        <br/>
+                        <span style={{color:'#f59e0b', fontWeight:'bold'}}>
+                          Confidence: {(selectedSnapshot.detection_metadata.detections[0].confidence * 100).toFixed(1)}%
+                        </span>
+                      </>
+                    )}
+                  </p>
                 </div>
               )}
             </div>
@@ -225,20 +346,24 @@ const styles = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '20px',
+    gridTemplateColumns: 'repeat(8, 1fr)',
+    gap: '16px',
+    maxHeight: '900px',
+    overflowY: 'auto',
+    paddingRight: '16px',
   },
   card: {
     backgroundColor: 'white',
     borderRadius: '12px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
     overflow: 'hidden',
     transition: 'transform 0.2s, box-shadow 0.2s',
     cursor: 'pointer',
+    width: '100%',
   },
   imageContainer: {
     width: '100%',
-    height: '200px',
+    height: '180px',
     backgroundColor: '#f3f4f6',
     display: 'flex',
     justifyContent: 'center',
@@ -251,12 +376,12 @@ const styles = {
     objectFit: 'cover',
   },
   metadata: {
-    padding: '16px',
+    padding: '12px',
   },
   timestamp: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#6b7280',
-    marginBottom: '12px',
+    marginBottom: '8px',
     fontWeight: '500',
   },
   stats: {
@@ -270,29 +395,29 @@ const styles = {
     gap: '4px',
   },
   statIcon: {
-    fontSize: '16px',
+    fontSize: '14px',
   },
   statValue: {
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: '600',
     color: '#1f2937',
   },
   vlmResult: {
-    marginTop: '12px',
-    padding: '8px',
+    marginTop: '8px',
+    padding: '6px',
     backgroundColor: '#f0f9ff',
-    borderRadius: '6px',
+    borderRadius: '4px',
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '8px',
+    gap: '6px',
   },
   vlmIcon: {
-    fontSize: '16px',
+    fontSize: '14px',
   },
   vlmText: {
-    fontSize: '13px',
+    fontSize: '11px',
     color: '#1e40af',
-    lineHeight: '1.4',
+    lineHeight: '1.3',
   },
   loading: {
     textAlign: 'center',
@@ -410,6 +535,81 @@ const styles = {
     color: '#1e40af',
     lineHeight: '1.6',
     margin: '8px 0 0 0',
+  },
+  videoSection: {
+    marginBottom: '24px',
+    padding: '16px',
+    backgroundColor: '#fef3c7',
+    borderRadius: '12px',
+    borderLeft: '4px solid #f59e0b',
+  },
+  videoTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#92400e',
+    marginTop: 0,
+    marginBottom: '12px',
+  },
+  video: {
+    width: '100%',
+    maxHeight: '600px',
+    borderRadius: '8px',
+    backgroundColor: '#000',
+  },
+  modalVideoContainer: {
+    width: '100%',
+    maxHeight: '900px',
+    backgroundColor: '#000',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalVideo: {
+    width: '100%',
+    height: '900px',
+    objectFit: 'contain',
+  },
+  videoBadge: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    backgroundColor: 'rgba(220, 38, 38, 0.95)',
+    color: 'white',
+    padding: '4px 8px',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    fontSize: '11px',
+    fontWeight: '600',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+    zIndex: 5,
+  },
+  videoBadgeIcon: {
+    fontSize: '14px',
+  },
+  videoBadgeText: {
+    fontSize: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  videoIndicator: {
+    marginTop: '8px',
+    padding: '6px 8px',
+    backgroundColor: '#fef3c7',
+    borderRadius: '6px',
+    borderLeft: '2px solid #f59e0b',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  videoIndicatorIcon: {
+    fontSize: '14px',
+  },
+  videoIndicatorText: {
+    fontSize: '10px',
+    color: '#92400e',
+    fontWeight: '600',
   },
 };
 

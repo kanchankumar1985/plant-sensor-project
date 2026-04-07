@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -15,10 +15,37 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://plantuser:plantpass@local
 
 app = FastAPI(title="Plant Monitor API")
 
-# Mount images directory for static file serving
-IMAGES_DIR = Path(__file__).parent / "images"
-IMAGES_DIR.mkdir(exist_ok=True)
+# Mount images directory for static file serving (configurable via IMAGES_DIR env var)
+IMAGES_DIR = Path(os.getenv('IMAGES_DIR', str(Path(__file__).parent / "images")))
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
+
+# Videos directory (configurable via VIDEOS_DIR env var)
+VIDEOS_DIR = Path(os.getenv('VIDEOS_DIR', str(Path(__file__).parent / "videos")))
+VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Custom video endpoint with proper MIME type
+@app.get("/videos/{filename}")
+async def serve_video(filename: str):
+    """Serve video files with proper MIME type for browser compatibility"""
+    video_path = VIDEOS_DIR / filename
+    
+    if not video_path.exists():
+        return Response(status_code=404, content="Video not found")
+    
+    # Read video file
+    with open(video_path, 'rb') as f:
+        video_data = f.read()
+    
+    # Return with proper headers for AVI/MJPEG playback
+    return Response(
+        content=video_data,
+        media_type="video/x-msvideo",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(len(video_data)),
+        }
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -186,10 +213,10 @@ def get_latest_snapshot():
     }
 
 @app.get("/api/snapshots/recent")
-def get_recent_snapshots(limit: int = 10):
-    """Get recent plant snapshots with metadata"""
+def get_recent_snapshots(limit: int = 10000):
+    """Get all plant snapshots with metadata (default: 10,000)"""
     sql = """
-        SELECT time, image_path, temperature_c, humidity_pct, led_state, vlm_result
+        SELECT time, image_path, boxed_image_path, temperature_c, humidity_pct, led_state, vlm_result, person_detected, person_count, detection_metadata, video_path
         FROM plant_snapshots
         ORDER BY time DESC
         LIMIT %s
@@ -203,10 +230,15 @@ def get_recent_snapshots(limit: int = 10):
         {
             "time": row[0].isoformat(),
             "image_url": f"http://localhost:8000/images/{row[1]}",
-            "temperature_c": row[2],
-            "humidity_pct": row[3],
-            "led_state": row[4],
-            "vlm_result": row[5],
+            "boxed_image_url": f"http://localhost:8000/images/{row[2]}" if row[2] else None,
+            "temperature_c": row[3],
+            "humidity_pct": row[4],
+            "led_state": row[5],
+            "vlm_result": row[6],
+            "person_detected": row[7],
+            "person_count": row[8],
+            "detection_metadata": row[9],
+            "video_url": f"http://localhost:8000/videos/{row[10]}" if row[10] else None,
         }
         for row in rows
     ]

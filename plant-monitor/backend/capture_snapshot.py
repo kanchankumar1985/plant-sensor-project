@@ -11,6 +11,8 @@ from datetime import datetime
 import psycopg
 from dotenv import load_dotenv
 
+load_dotenv()
+
 # Database configuration
 DB_CONFIG = {
     'host': 'localhost',
@@ -21,8 +23,18 @@ DB_CONFIG = {
 }
 
 # Image storage configuration
-IMAGES_DIR = Path(__file__).parent / "images"
-IMAGES_DIR.mkdir(exist_ok=True)
+IMAGES_DIR = Path(os.getenv('IMAGES_DIR', str(Path(__file__).parent / "images")))
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+# Camera settings (configurable via environment variables)
+CAMERA_AUTO_EXPOSURE = int(os.getenv('CAMERA_AUTO_EXPOSURE', '1'))  # 1=manual, 3=auto
+CAMERA_EXPOSURE = int(os.getenv('CAMERA_EXPOSURE', '-6'))  # Range: -13 (darkest) to -1 (brightest)
+CAMERA_BRIGHTNESS = int(os.getenv('CAMERA_BRIGHTNESS', '128'))  # Range: 0-255
+CAMERA_CONTRAST = int(os.getenv('CAMERA_CONTRAST', '32'))  # Range: 0-100
+CAMERA_WARMUP_TIME = float(os.getenv('CAMERA_WARMUP_TIME', '0.5'))  # Seconds to wait after setting properties
+
+# Image compression settings
+IMAGE_JPEG_QUALITY = int(os.getenv('IMAGE_JPEG_QUALITY', '85'))  # 0-100, higher = better quality but larger file
 
 def connect_database():
     """Connect to TimescaleDB"""
@@ -43,6 +55,16 @@ def capture_webcam_image():
             print("❌ Cannot open webcam")
             return None
         
+        # Set camera properties (configurable via environment variables)
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, CAMERA_AUTO_EXPOSURE)
+        cap.set(cv2.CAP_PROP_EXPOSURE, CAMERA_EXPOSURE)
+        cap.set(cv2.CAP_PROP_BRIGHTNESS, CAMERA_BRIGHTNESS)
+        cap.set(cv2.CAP_PROP_CONTRAST, CAMERA_CONTRAST)
+        
+        # Allow camera to adjust
+        import time
+        time.sleep(CAMERA_WARMUP_TIME)
+        
         # Capture frame
         ret, frame = cap.read()
         
@@ -58,9 +80,12 @@ def capture_webcam_image():
         filename = f"plant_{timestamp}.jpg"
         filepath = IMAGES_DIR / filename
         
-        # Save image
-        cv2.imwrite(str(filepath), frame)
-        print(f"📸 Image captured: {filename}")
+        # Save image with JPEG compression
+        cv2.imwrite(str(filepath), frame, [cv2.IMWRITE_JPEG_QUALITY, IMAGE_JPEG_QUALITY])
+        
+        # Show file size
+        file_size_kb = filepath.stat().st_size / 1024
+        print(f"📸 Image captured: {filename} ({file_size_kb:.1f} KB)")
         
         return filename
         

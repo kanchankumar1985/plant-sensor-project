@@ -36,7 +36,7 @@ DB_CONFIG = {
 # Temperature threshold for auto-snapshot
 TEMP_THRESHOLD = 25.0  # Capture snapshot when temp >= 25°C
 last_snapshot_time = None
-SNAPSHOT_COOLDOWN = 20  # Wait 60 seconds (1 minute) between auto-snapshots
+SNAPSHOT_COOLDOWN = int(os.getenv('SNAPSHOT_COOLDOWN', '30'))  # Configurable cooldown between auto-snapshots
 
 def connect_database():
     """Connect to TimescaleDB"""
@@ -116,7 +116,7 @@ def trigger_snapshot_if_needed(sensor_data, db_conn):
         if success:
             last_snapshot_time = current_time
             print(f"✅ Auto-snapshot with detection captured successfully!")
-            print(f"⏳ Next auto-snapshot available in {SNAPSHOT_COOLDOWN//60} minutes\n")
+            print(f"⏳ Next auto-snapshot available in {SNAPSHOT_COOLDOWN} seconds\n")
             return True
         else:
             print("❌ Auto-snapshot failed\n")
@@ -163,7 +163,7 @@ def main():
     """Main serial reader loop"""
     print("🌱 Plant Sensor Serial Reader Starting...")
     print(f"🌡️  Temperature threshold: {TEMP_THRESHOLD}°C")
-    print(f"📸 Auto-snapshot: Enabled (cooldown: {SNAPSHOT_COOLDOWN//60} min)")
+    print(f"📸 Auto-snapshot: Enabled (cooldown: {SNAPSHOT_COOLDOWN} sec)")
     
     # Connect to database
     db_conn = connect_database()
@@ -179,6 +179,10 @@ def main():
     
     print("🚀 Serial reader running. Press Ctrl+C to stop.")
     
+    # Flush initial garbage data
+    time.sleep(2)
+    ser.reset_input_buffer()
+    
     try:
         while True:
             try:
@@ -186,19 +190,22 @@ def main():
                 line = ser.readline().decode('utf-8', errors='ignore').strip()
                 
                 if line:
-                    # Print raw line for debugging
+                    # Print raw line for debugging (only first 100 chars)
                     if line.startswith('READY') or line.startswith('ERROR'):
                         print(f"📟 {line}")
                         continue
                     
-                    # Parse sensor data
-                    sensor_data = parse_sensor_data(line)
-                    
-                    if sensor_data:
-                        # Insert into database
-                        insert_sensor_data(db_conn, sensor_data)
-                    elif line and not line.startswith('{'):
-                        print(f"📟 {line}")
+                    # Only process lines that look like JSON
+                    if line.startswith('{') and line.endswith('}'):
+                        # Parse sensor data
+                        sensor_data = parse_sensor_data(line)
+                        
+                        if sensor_data:
+                            # Insert into database
+                            insert_sensor_data(db_conn, sensor_data)
+                    elif line and len(line) < 200:
+                        # Print non-JSON lines for debugging (truncated)
+                        print(f"📟 {line[:100]}")
                 
             except UnicodeDecodeError:
                 continue
