@@ -3,3 +3,7 @@ uvicorn[standard]
 psycopg[binary]
 python-dotenv
 pydantic
+pyserial
+psycopg2-binary
+opencv-python
+ultralytics
