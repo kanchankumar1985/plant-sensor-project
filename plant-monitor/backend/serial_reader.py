@@ -82,6 +82,30 @@ def parse_sensor_data(line):
         print(f"Parse error: {e}")
         return None
 
+def insert_touch_event(conn, state, device_id='plant-esp32-01'):
+    """Insert touch event into TimescaleDB"""
+    try:
+        cur = conn.cursor()
+        
+        insert_query = """
+        INSERT INTO touch_events (device_id, state, timestamp)
+        VALUES (%s, %s, NOW())
+        """
+        
+        cur.execute(insert_query, (device_id, state))
+        conn.commit()
+        cur.close()
+        
+        emoji = "👆" if state == "TOUCHED" else "🖐️"
+        print(f"{emoji} Touch: {state}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Touch event insert failed: {e}")
+        conn.rollback()
+        return False
+
 def trigger_snapshot_if_needed(sensor_data, db_conn):
     """Trigger webcam snapshot with person detection if temperature exceeds threshold"""
     global last_snapshot_time
@@ -190,8 +214,14 @@ def main():
                 line = ser.readline().decode('utf-8', errors='ignore').strip()
                 
                 if line:
+                    # Handle touch events
+                    if line.startswith('TOUCH_EVENT:'):
+                        state = line.split(':', 1)[1]
+                        insert_touch_event(db_conn, state)
+                        continue
+                    
                     # Print raw line for debugging (only first 100 chars)
-                    if line.startswith('READY') or line.startswith('ERROR'):
+                    if line.startswith('READY') or line.startswith('ERROR') or line.startswith('INFO') or line.startswith('DEBUG'):
                         print(f"📟 {line}")
                         continue
                     

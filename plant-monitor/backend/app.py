@@ -67,6 +67,17 @@ class SensorReadingOut(BaseModel):
     humidity_pct: float
     led_state: int = 0
 
+class TouchEventIn(BaseModel):
+    device_id: str = Field(default="plant-esp32-01")
+    state: str = Field(..., pattern="^(TOUCHED|NOT_TOUCHED)$")
+    timestamp: datetime | None = None
+
+class TouchEventOut(BaseModel):
+    id: int
+    timestamp: datetime
+    device_id: str
+    state: str
+
 def get_conn():
     return psycopg.connect(DATABASE_URL)
 
@@ -279,4 +290,109 @@ def get_latest_detection():
         "person_detected": row[7],
         "person_count": row[8],
         "detection_metadata": row[9],
+    }
+
+# ========== TOUCH SENSOR ENDPOINTS ==========
+
+@app.post("/api/touch-event", response_model=TouchEventOut)
+def create_touch_event(payload: TouchEventIn):
+    """Record a touch sensor event"""
+    sql = """
+        INSERT INTO touch_events (device_id, state, timestamp)
+        VALUES (%s, %s, COALESCE(%s, NOW()))
+        RETURNING id, timestamp, device_id, state
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (payload.device_id, payload.state, payload.timestamp),
+            )
+            row = cur.fetchone()
+            conn.commit()
+
+    return {
+        "id": row[0],
+        "timestamp": row[1],
+        "device_id": row[2],
+        "state": row[3],
+    }
+
+@app.get("/api/touch-event/latest")
+def get_latest_touch_event():
+    """Get the most recent touch event"""
+    sql = """
+        SELECT id, timestamp, device_id, state
+        FROM touch_events
+        ORDER BY timestamp DESC
+        LIMIT 1
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "id": row[0],
+        "timestamp": row[1],
+        "device_id": row[2],
+        "state": row[3],
+    }
+
+@app.get("/api/touch-event/recent")
+def get_recent_touch_events(limit: int = 100):
+    """Get recent touch events"""
+    sql = """
+        SELECT id, timestamp, device_id, state
+        FROM touch_events
+        ORDER BY timestamp DESC
+        LIMIT %s
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (limit,))
+            rows = cur.fetchall()
+
+    data = [
+        {
+            "id": row[0],
+            "timestamp": row[1].isoformat(),
+            "device_id": row[2],
+            "state": row[3],
+        }
+        for row in rows
+    ]
+
+    data.reverse()
+    return data
+
+@app.get("/api/touch-event/status")
+def get_touch_status():
+    """Get current touch status from latest_touch_state view"""
+    sql = """
+        SELECT device_id, timestamp, state
+        FROM latest_touch_state
+        WHERE device_id = 'plant-esp32-01'
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+
+    if not row:
+        return {
+            "device_id": "plant-esp32-01",
+            "timestamp": None,
+            "state": "NOT_TOUCHED",
+            "is_touched": False,
+        }
+
+    return {
+        "device_id": row[0],
+        "timestamp": row[1].isoformat(),
+        "state": row[2],
+        "is_touched": row[2] == "TOUCHED",
     }
