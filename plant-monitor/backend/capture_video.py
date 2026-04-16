@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Use centralized logging
+import logging_config
+logger = logging_config.get_camera_logger()
+
 # Video storage configuration
 VIDEOS_DIR = Path(os.getenv('VIDEOS_DIR', str(Path(__file__).parent / "videos")))
 VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -40,20 +44,20 @@ def record_video_alert(duration=None, fps=None):
         str: Filename of recorded video, or None if failed
     """
     if not VIDEO_ALERT_ENABLED:
-        print("📹 Video alerts disabled in config")
+        logger.info("📹 Video alerts disabled in config")
         return None
     
     duration = duration or VIDEO_ALERT_DURATION
     fps = fps or VIDEO_ALERT_FPS
     
     try:
-        print(f"🎥 Starting video recording ({duration}s at {fps} FPS)...")
+        logger.info(f"🎥 Starting video recording ({duration}s at {fps} FPS)...")
         
         # Initialize webcam
         cap = cv2.VideoCapture(0)
         
         if not cap.isOpened():
-            print("❌ Cannot open webcam for video recording")
+            logger.info("❌ Cannot open webcam for video recording")
             return None
         
         # Set camera properties
@@ -66,7 +70,7 @@ def record_video_alert(duration=None, fps=None):
         # Get frame dimensions
         ret, frame = cap.read()
         if not ret:
-            print("❌ Failed to read frame from webcam")
+            logger.info("❌ Failed to read frame from webcam")
             cap.release()
             return None
         
@@ -84,7 +88,7 @@ def record_video_alert(duration=None, fps=None):
         out = cv2.VideoWriter(str(temp_filepath), fourcc, fps, (width, height))
         
         if not out.isOpened():
-            print(f"❌ Failed to create video writer")
+            logger.info(f"❌ Failed to create video writer")
             cap.release()
             return None
         
@@ -106,14 +110,14 @@ def record_video_alert(duration=None, fps=None):
                 if elapsed < frame_interval:
                     time.sleep(frame_interval - elapsed)
             else:
-                print("⚠️  Failed to capture frame, continuing...")
+                logger.info("⚠️  Failed to capture frame, continuing...")
         
         # Release resources
         cap.release()
         out.release()
         
         # Convert AVI to MP4 using ffmpeg for browser compatibility
-        print(f"🔄 Converting to MP4 format...")
+        logger.info(f"🔄 Converting to MP4 format...")
         try:
             subprocess.run([
                 'ffmpeg', '-i', str(temp_filepath),
@@ -130,28 +134,28 @@ def record_video_alert(duration=None, fps=None):
             # Verify MP4 file was created
             if final_filepath.exists() and final_filepath.stat().st_size > 0:
                 file_size_kb = final_filepath.stat().st_size / 1024
-                print(f"✅ Video recorded: {final_filename}")
-                print(f"   📹 Duration: {duration}s")
-                print(f"   🎞️  Frames: {frame_count}")
-                print(f"   📦 Size: {file_size_kb:.1f} KB")
+                logger.info(f"✅ Video recorded: {final_filename}")
+                logger.info(f"   📹 Duration: {duration}s")
+                logger.info(f"   🎞️  Frames: {frame_count}")
+                logger.info(f"   📦 Size: {file_size_kb:.1f} KB")
                 return final_filename
             else:
-                print(f"❌ MP4 file not created or empty")
+                logger.info(f"❌ MP4 file not created or empty")
                 return None
                 
         except subprocess.CalledProcessError as e:
-            print(f"❌ FFmpeg conversion failed: {e}")
+            logger.info(f"❌ FFmpeg conversion failed: {e}")
             # If conversion fails, try to use the AVI file
             if temp_filepath.exists():
                 temp_filepath.rename(final_filepath.with_suffix('.avi'))
                 return final_filename.replace('.mp4', '.avi')
             return None
         except Exception as e:
-            print(f"❌ Video conversion error: {e}")
+            logger.info(f"❌ Video conversion error: {e}")
             return None
         
     except Exception as e:
-        print(f"❌ Video recording failed: {e}")
+        logger.info(f"❌ Video recording failed: {e}")
         if 'cap' in locals():
             cap.release()
         if 'out' in locals():
@@ -160,9 +164,9 @@ def record_video_alert(duration=None, fps=None):
 
 if __name__ == "__main__":
     # Test video recording
-    print("🧪 Testing video recording...")
+    logger.info("🧪 Testing video recording...")
     video_file = record_video_alert()
     if video_file:
-        print(f"✅ Test successful! Video saved: {video_file}")
+        logger.info(f"✅ Test successful! Video saved: {video_file}")
     else:
-        print("❌ Test failed")
+        logger.info("❌ Test failed")

@@ -1,6 +1,7 @@
 from datetime import datetime
 import os
 from pathlib import Path
+import json
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Response
@@ -11,9 +12,26 @@ import psycopg
 
 load_dotenv()
 
+# Initialize logging system
+import logging_config
+logging_config.init_logging()
+logger = logging_config.get_app_logger()
+
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://plantuser:plantpass@localhost:5433/plantdb")
 
 app = FastAPI(title="Plant Monitor API")
+
+logger.info("FastAPI application starting")
+
+# Import and register touch sensor routes
+from touch_routes import router as touch_router
+app.include_router(touch_router)
+logger.info("Touch sensor routes registered")
+
+# Import and register logs routes
+from routes.logs import router as logs_router
+app.include_router(logs_router)
+logger.info("Logs API routes registered")
 
 # Mount images directory for static file serving (configurable via IMAGES_DIR env var)
 IMAGES_DIR = Path(os.getenv('IMAGES_DIR', str(Path(__file__).parent / "images")))
@@ -83,30 +101,37 @@ def get_conn():
 
 @app.get("/health")
 def health():
+    logger.debug("Health check requested")
     return {"status": "ok"}
 
 @app.post("/api/readings")
 def create_reading(payload: SensorReadingIn):
+    logger.info(f"Sensor reading received: {payload.device_id} - {payload.temperature_c}°C, {payload.humidity_pct}%")
     sql = """
         INSERT INTO sensor_readings (device_id, temperature_c, humidity_pct)
         VALUES (%s, %s, %s)
         RETURNING time, device_id, temperature_c, humidity_pct
     """
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                sql,
-                (payload.device_id, payload.temperature_c, payload.humidity_pct),
-            )
-            row = cur.fetchone()
-            conn.commit()
-
-    return {
-        "time": row[0],
-        "device_id": row[1],
-        "temperature_c": row[2],
-        "humidity_pct": row[3],
-    }
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    sql,
+                    (payload.device_id, payload.temperature_c, payload.humidity_pct),
+                )
+                row = cur.fetchone()
+                conn.commit()
+        
+        logger.info(f"Sensor reading saved: {row[1]} at {row[0]}")
+        return {
+            "time": row[0],
+            "device_id": row[1],
+            "temperature_c": row[2],
+            "humidity_pct": row[3],
+        }
+    except Exception as e:
+        logger.error(f"Failed to save sensor reading: {e}", exc_info=True)
+        raise
 
 @app.get("/api/readings/latest", response_model=SensorReadingOut | None)
 def get_latest():
@@ -241,6 +266,7 @@ def get_recent_snapshots(limit: int = 10000):
         {
             "time": row[0].isoformat(),
             "image_url": f"http://localhost:8000/images/{row[1]}",
+            "image_path": row[1],
             "boxed_image_url": f"http://localhost:8000/images/{row[2]}" if row[2] else None,
             "temperature_c": row[3],
             "humidity_pct": row[4],
@@ -395,4 +421,256 @@ def get_touch_status():
         "timestamp": row[1].isoformat(),
         "state": row[2],
         "is_touched": row[2] == "TOUCHED",
+    }
+
+# ========== VLM ANALYSIS ENDPOINTS ==========
+
+@app.get("/api/analysis/latest-image")
+def get_latest_image_analysis():
+    """Get the most recent image with VLM analysis"""
+    sql = """
+        SELECT time, image_path, boxed_image_path, video_path, temperature_c, humidity_pct, 
+               led_state, person_detected, person_count, plant_visible, plant_occluded,
+               plant_health_guess, yellowing_visible, drooping_visible, wilting_visible,
+               image_quality, vlm_summary, vlm_analysis, analysis_reliability, 
+               analysis_status, vlm_model, analyzed_at
+        FROM plant_snapshots
+        WHERE analysis_status IS NOT NULL
+        ORDER BY time DESC
+        LIMIT 1
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "time": row[0],
+        "image_path": row[1],
+        "boxed_image_path": row[2],
+        "video_path": row[3],
+        "image_url": f"http://localhost:8000/images/{row[1]}" if row[1] else None,
+        "boxed_image_url": f"http://localhost:8000/images/{row[2]}" if row[2] else None,
+        "video_url": f"http://localhost:8000/videos/{row[3]}" if row[3] else None,
+        "temperature_c": row[4],
+        "humidity_pct": row[5],
+        "led_state": row[6],
+        "person_detected": row[7],
+        "person_count": row[8],
+        "plant_visible": row[9],
+        "plant_occluded": row[10],
+        "plant_health_guess": row[11],
+        "yellowing_visible": row[12],
+        "drooping_visible": row[13],
+        "wilting_visible": row[14],
+        "image_quality": row[15],
+        "vlm_summary": row[16],
+        "vlm_analysis": row[17],
+        "analysis_reliability": row[18],
+        "analysis_status": row[19],
+        "vlm_model": row[20],
+        "analyzed_at": row[21],
+    }
+
+@app.get("/api/analysis/latest-video")
+def get_latest_video_analysis():
+    """Get the most recent video event analysis"""
+    sql = """
+        SELECT time, video_path, snapshot_id, vlm_summary, vlm_analysis,
+               person_entered, person_left, person_stayed, plant_touched, plant_blocked,
+               plant_visible_throughout, significant_motion, motion_description, event_type,
+               frames_analyzed, frame_paths, analysis_status, vlm_model, analyzed_at
+        FROM video_analysis
+        WHERE analysis_status IS NOT NULL
+        ORDER BY time DESC
+        LIMIT 1
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "time": row[0],
+        "video_path": row[1],
+        "video_url": f"http://localhost:8000/videos/{row[1]}" if row[1] else None,
+        "snapshot_id": row[2],
+        "vlm_summary": row[3],
+        "vlm_analysis": row[4],
+        "person_entered": row[5],
+        "person_left": row[6],
+        "person_stayed": row[7],
+        "plant_touched": row[8],
+        "plant_blocked": row[9],
+        "plant_visible_throughout": row[10],
+        "significant_motion": row[11],
+        "motion_description": row[12],
+        "event_type": row[13],
+        "frames_analyzed": row[14],
+        "frame_paths": row[15],
+        "analysis_status": row[16],
+        "vlm_model": row[17],
+        "analyzed_at": row[18],
+    }
+
+@app.get("/api/analysis/recent")
+def get_recent_analyses(limit: int = 20):
+    """Get recent VLM analyses"""
+    sql = """
+        SELECT time, image_path, plant_health_guess, vlm_summary, 
+               analysis_status, person_detected, temperature_c, humidity_pct
+        FROM plant_snapshots
+        WHERE analysis_status IS NOT NULL
+        ORDER BY time DESC
+        LIMIT %s
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (limit,))
+            rows = cur.fetchall()
+
+    return [
+        {
+            "time": row[0].isoformat(),
+            "image_url": f"http://localhost:8000/images/{row[1]}" if row[1] else None,
+            "plant_health_guess": row[2],
+            "vlm_summary": row[3],
+            "analysis_status": row[4],
+            "person_detected": row[5],
+            "temperature_c": row[6],
+            "humidity_pct": row[7],
+        }
+        for row in rows
+    ]
+
+@app.get("/api/analysis/health-alerts")
+def get_health_alerts():
+    """Get snapshots with plant health concerns"""
+    sql = """
+        SELECT time, image_path, plant_health_guess, yellowing_visible, 
+               drooping_visible, wilting_visible, vlm_summary, temperature_c, humidity_pct
+        FROM plant_snapshots
+        WHERE analysis_status = 'completed'
+          AND (yellowing_visible = TRUE 
+               OR drooping_visible = TRUE 
+               OR wilting_visible = TRUE
+               OR plant_health_guess IN ('yellowing', 'drooping', 'wilting'))
+        ORDER BY time DESC
+        LIMIT 50
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+
+    return [
+        {
+            "time": row[0].isoformat(),
+            "image_url": f"http://localhost:8000/images/{row[1]}" if row[1] else None,
+            "plant_health_guess": row[2],
+            "yellowing_visible": row[3],
+            "drooping_visible": row[4],
+            "wilting_visible": row[5],
+            "vlm_summary": row[6],
+            "temperature_c": row[7],
+            "humidity_pct": row[8],
+        }
+        for row in rows
+    ]
+
+@app.get("/api/analysis/status")
+def get_ai_status():
+    """Get AI system status (Ollama, model, queue)"""
+    # Check Ollama connection
+    ollama_connected = False
+    model_name = None
+    available_models = []
+    
+    try:
+        from vlm.ollama_client import get_ollama_client
+        client = get_ollama_client()
+        ollama_connected = client.check_health()
+        model_name = client.model
+        
+        # Try to get available models
+        import requests
+        response = requests.get(f"{client.host}/api/tags", timeout=2)
+        if response.ok:
+            models = response.json().get('models', [])
+            available_models = [m.get('name') for m in models]
+    except Exception as e:
+        print(f"Ollama status check failed: {e}")
+    
+    # Get queue stats from database
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            # Count by status
+            cur.execute("""
+                SELECT analysis_status, COUNT(*) 
+                FROM plant_snapshots 
+                WHERE analysis_status IS NOT NULL
+                GROUP BY analysis_status
+            """)
+            status_counts = dict(cur.fetchall())
+            
+            # Get recent stats
+            cur.execute("""
+                SELECT 
+                    MAX(analyzed_at) as last_analysis,
+                    COUNT(*) FILTER (WHERE DATE(analyzed_at) = CURRENT_DATE) as today_count,
+                    AVG(EXTRACT(EPOCH FROM (analyzed_at - time))) as avg_time
+                FROM plant_snapshots
+                WHERE analyzed_at IS NOT NULL
+            """)
+            stats = cur.fetchone()
+            
+            # Get recent errors
+            cur.execute("""
+                SELECT time, analysis_error
+                FROM plant_snapshots
+                WHERE analysis_error IS NOT NULL
+                ORDER BY time DESC
+                LIMIT 5
+            """)
+            error_rows = cur.fetchall()
+    
+    recent_errors = [
+        {"time": row[0].isoformat(), "message": row[1], "type": "Analysis Error"}
+        for row in error_rows
+    ]
+    
+    return {
+        "ollama_connected": ollama_connected,
+        "ollama_host": "http://localhost:11434",
+        "model_name": model_name,
+        "model_size": "7B" if model_name and "7b" in model_name.lower() else "Unknown",
+        "available_models": available_models,
+        "model_loaded": ollama_connected and model_name is not None,
+        "database_connected": True,
+        "pending_count": status_counts.get('queued', 0),
+        "processing_count": status_counts.get('processing', 0),
+        "completed_count": status_counts.get('completed', 0),
+        "failed_count": status_counts.get('failed', 0),
+        "skipped_count": status_counts.get('skipped', 0),
+        "last_analysis_time": stats[0].isoformat() if stats[0] else None,
+        "analyses_today": stats[1] or 0,
+        "avg_processing_time": float(stats[2]) if stats[2] else None,
+        "success_rate": status_counts.get('completed', 0) / max(sum(status_counts.values()), 1),
+        "recent_errors": recent_errors,
+    }
+
+@app.post("/api/analysis/run-latest")
+def trigger_analysis():
+    """Trigger VLM analysis on the most recent snapshot"""
+    # This would trigger the analysis pipeline
+    # For now, return a placeholder
+    return {
+        "status": "triggered",
+        "message": "Analysis pipeline triggered. Run capture_with_vlm.py manually for now."
     }
