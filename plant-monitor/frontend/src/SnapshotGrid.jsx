@@ -127,6 +127,11 @@ const SnapshotGrid = () => {
               <div style={styles.timestamp}>
                 📅 {new Date(snapshot.time).toLocaleString()}
               </div>
+              {snapshot.image_path && (
+                <div style={styles.filename}>
+                  {snapshot.image_path}
+                </div>
+              )}
               
               <div style={styles.stats}>
                 <div style={styles.stat}>
@@ -401,6 +406,14 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
     color: '#1f2937',
+  },
+  filename: {
+    marginTop: '4px',
+    fontSize: '11px',
+    color: '#4b5563',
+    fontWeight: '500',
+    textTransform: 'lowercase',
+    wordBreak: 'break-all',
   },
   vlmResult: {
     marginTop: '8px',

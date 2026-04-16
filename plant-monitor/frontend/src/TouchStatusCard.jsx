@@ -12,12 +12,28 @@ export default function TouchStatusCard() {
 
   const fetchTouchStatus = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/touch-event/status');
+      const response = await fetch('http://localhost:8000/api/touch/latest');
       if (!response.ok) {
+        if (response.status === 404) {
+          // No events yet
+          setTouchStatus({
+            state: 'NOT_TOUCHED',
+            timestamp: null,
+            seconds_ago: null,
+          });
+          setError(null);
+          setIsLoading(false);
+          return;
+        }
         throw new Error('Failed to fetch touch status');
       }
       const data = await response.json();
-      setTouchStatus(data);
+      setTouchStatus({
+        state: data.state,
+        timestamp: data.timestamp,
+        seconds_ago: data.seconds_ago,
+        is_touched: data.state === 'TOUCHED',
+      });
       setError(null);
     } catch (err) {
       setError(err.message);

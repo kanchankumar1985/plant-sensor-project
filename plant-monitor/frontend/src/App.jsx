@@ -12,6 +12,11 @@ import {
 import PlantSnapshot from "./PlantSnapshot";
 import SnapshotGrid from "./SnapshotGrid";
 import PersonDetection from "./PersonDetection";
+import AIAnalysisCard from "./AIAnalysisCard";
+import VideoAnalysisCard from "./VideoAnalysisCard";
+import PlantHealthCard from "./PlantHealthCard";
+import AIStatusCard from "./AIStatusCard";
+import LogsPanel from "./components/LogsPanel";
 
 const API_BASE = "http://localhost:8000";
 
@@ -316,6 +321,21 @@ export default function App() {
 
       {/* Person Detection Section */}
       <PersonDetection />
+
+      {/* AI Analysis Section */}
+      <AIAnalysisCard />
+
+      {/* Video Analysis Section */}
+      <VideoAnalysisCard />
+
+      {/* Plant Health Dashboard */}
+      <PlantHealthCard />
+
+      {/* AI System Status */}
+      <AIStatusCard />
+
+      {/* System Logs Panel */}
+      {/* <LogsPanel /> */}
 
       {/* Snapshot Grid Gallery */}
       <SnapshotGrid />
