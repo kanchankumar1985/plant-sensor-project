@@ -125,25 +125,24 @@ Respond ONLY with valid JSON in this exact format:
 Be very precise about text on clothing. If you see text like "beach", "surf", "ocean", or any other words, include them exactly as they appear in the shirt_text field. If text is partially visible or unclear, describe what you can see.
 """
 
-PERSON_DETAILED_JSON_PROMPT = """RReturn ONLY valid JSON. Do not include any text.
+PERSON_DETAILED_JSON_PROMPT = """Return ONLY valid JSON. Do not include any extra text.
 
 {
+  "person_present": true or false,
   "person_detected": true or false,
-  "facing_camera": true or false
+  "person_count": integer (0 if no person),
+  "position": "left" or "center" or "right" or "unknown",
+  "facing_camera": true or false,
+  "image_quality": "good" or "poor" or "dark" or "blurry",
+  "summary": "1 concise sentence about person presence and pose"
 }
 
 Rules:
-- Output must be valid JSON
+- Output must be valid JSON only
 - Do not use markdown
 - Do not add explanation
 - Use lowercase true/false
-- If no person is visible, return:
-{
-  "person_detected": false,
-  "facing_camera": false
-}
-
-If the image is too dark or blank to describe confidently, respond with person_detected: false and explain the uncertainty.”
+- If no person is visible, return person_present=false, person_detected=false, person_count=0, facing_camera=false
 """
 
 def get_image_analysis_prompt() -> str:
