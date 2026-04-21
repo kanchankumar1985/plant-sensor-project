@@ -178,8 +178,8 @@ class TouchWorkflowOrchestrator:
         with self.lock:
             self.status.current_step = "recording_video"
         
-        # Check if video recording is enabled via environment variable
-        enable_video = os.getenv('TOUCH_VIDEO_ENABLED', 'false').lower() in ('true', '1', 'yes')
+        # Check if video recording is enabled via environment variable (default: enabled)
+        enable_video = os.getenv('TOUCH_VIDEO_ENABLED', 'true').lower() in ('true', '1', 'yes')
         
         if not enable_video:
             logger.info("⏭️  Step 2: Video recording disabled (set TOUCH_VIDEO_ENABLED=true to enable)")
@@ -216,7 +216,8 @@ class TouchWorkflowOrchestrator:
         try:
             yolo_result = process_image_for_person_detection(self.status.image_path)
             if yolo_result:
-                self.status.yolo_result = yolo_result.get('metadata', {})
+                # Store the full YOLO result (includes boxed_image_path)
+                self.status.yolo_result = yolo_result
                 self.status.person_detected = yolo_result['metadata'].get('person_detected', False)
                 self.status.person_count = yolo_result['metadata'].get('person_count', 0)
                 
@@ -291,14 +292,18 @@ class TouchWorkflowOrchestrator:
                         'led_state': False
                     }
                 
-                # Prepare YOLO result
-                yolo_result = {
-                    'metadata': {
-                        'person_detected': self.status.person_detected,
-                        'person_count': self.status.person_count
-                    },
-                    'boxed_image_path': None
-                }
+                # Use the actual YOLO result from status (includes boxed_image_path)
+                if self.status.yolo_result:
+                    yolo_result = self.status.yolo_result
+                else:
+                    # Fallback if YOLO didn't run
+                    yolo_result = {
+                        'metadata': {
+                            'person_detected': self.status.person_detected,
+                            'person_count': self.status.person_count
+                        },
+                        'boxed_image_path': None
+                    }
                 
                 # Extract just the filename from paths
                 image_filename = Path(self.status.image_path).name if self.status.image_path else None
