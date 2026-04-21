@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import logging
 
-logger = logging.getLogger(__name__)
+# Use centralized logging
+try:
+    import logging_config
+    logger = logging_config.get_serial_logger()
+except ImportError:
+    logger = logging.getLogger(__name__)
 
 # Import existing services
 try:
@@ -85,6 +90,7 @@ class TouchWorkflowOrchestrator:
         self.tts = get_tts_service()
         self.status = TouchWorkflowStatus()
         self.lock = threading.Lock()
+        self.serial_port = None  # Will be set by serial listener
     
     def handle_touch_event(self):
         """
@@ -213,7 +219,24 @@ class TouchWorkflowOrchestrator:
                 self.status.yolo_result = yolo_result.get('metadata', {})
                 self.status.person_detected = yolo_result['metadata'].get('person_detected', False)
                 self.status.person_count = yolo_result['metadata'].get('person_count', 0)
-                logger.info(f"✓ YOLO complete - Person detected: {self.status.person_detected}, Count: {self.status.person_count}")
+                
+                logger.info("")
+                logger.info("=" * 60)
+                logger.info(f"✓ YOLO DETECTION COMPLETE")
+                logger.info(f"   Person detected: {self.status.person_detected}")
+                logger.info(f"   Person count: {self.status.person_count}")
+                logger.info("=" * 60)
+                
+                # Trigger pump immediately if person detected
+                if self.status.person_detected and self.serial_port:
+                    logger.info("💧 PUMP DECISION: Person detected in snapshot image")
+                    logger.info("💧 PUMP STATE: Will be turned ON")
+                    self._trigger_pump()
+                else:
+                    logger.info("💧 PUMP DECISION: No person detected in snapshot image")
+                    logger.info("💧 PUMP STATE: Will remain OFF")
+                
+                logger.info("")
             else:
                 logger.warning("⚠️  YOLO detection failed")
         except Exception as e:
@@ -289,10 +312,10 @@ class TouchWorkflowOrchestrator:
                         sensor_data,
                         yolo_result,
                         status='queued',  # Queue for VLM analysis
-                        reason=None,
+                        error=None,
                         sensor_timestamp=None,
                         video_filename=video_filename,
-                        model_name='llava:7b'
+                        vlm_model='llava:7b'
                     )
                     
                     if success:
@@ -308,6 +331,28 @@ class TouchWorkflowOrchestrator:
             
         except Exception as e:
             logger.error(f"❌ Database save error: {e}", exc_info=True)
+    
+    def set_serial_port(self, serial_port):
+        """Set the serial port for pump control"""
+        self.serial_port = serial_port
+    
+    def _trigger_pump(self):
+        """Trigger the pump via serial command"""
+        try:
+            logger.info("")
+            logger.info("👤" * 20)
+            logger.info("PERSON DETECTED IN IMAGE!")
+            logger.info("💧 TRIGGERING PUMP...")
+            logger.info("👤" * 20)
+            logger.info("")
+            
+            # Send pump command to ESP32
+            logger.info("📤 Sending pump command to ESP32...")
+            self.serial_port.write(b"PUMP_ON_YELLOW_LEAVES\n")
+            self.serial_port.flush()
+            logger.info("✅ Pump command sent!")
+        except Exception as e:
+            logger.error(f"❌ Failed to send pump command: {e}")
     
     def get_status(self) -> Dict[str, Any]:
         """Get current workflow status"""

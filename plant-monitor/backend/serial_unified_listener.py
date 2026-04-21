@@ -236,14 +236,13 @@ def main_loop(port=None):
                     logger.info("🖐️" * 20)
                     logger.info("")
                     
-                    # Trigger workflow (includes TTS)
-                    handle_touch_event()
-                    
-                    # Log status
-                    time.sleep(0.5)
+                    # Set serial port in orchestrator for pump control
                     orchestrator = get_orchestrator()
-                    status = orchestrator.get_status()
-                    logger.info(f"Workflow status: {status['status']}")
+                    orchestrator.set_serial_port(ser)
+                    
+                    # Trigger workflow (non-blocking - pump will trigger when YOLO completes)
+                    handle_touch_event()
+                    logger.info("✅ Workflow started (pump will trigger when person detected)")
                     logger.info("")
                     continue
                 
