@@ -268,8 +268,8 @@ def main_loop(port=None):
                                   f"Humidity: {sensor_data['humidity_pct']:.2f}%, "
                                   f"LED: {led_str}")
                     
-                    # Check temperature threshold
-                    check_temperature_threshold(sensor_data['temperature_c'])
+                    # DISABLED: Auto temperature threshold snapshot
+                    # check_temperature_threshold(sensor_data['temperature_c'])
                     
                     # Update health tracking
                     global last_valid_read_ts
