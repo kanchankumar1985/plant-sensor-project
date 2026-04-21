@@ -58,6 +58,8 @@ class TouchWorkflowStatus:
         self.image_path: Optional[str] = None
         self.video_path: Optional[str] = None
         self.yolo_result: Optional[Dict] = None
+        self.person_detected: bool = False
+        self.person_count: int = 0
         self.error: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
@@ -70,6 +72,8 @@ class TouchWorkflowStatus:
             "image_path": self.image_path,
             "video_path": self.video_path,
             "yolo_result": self.yolo_result,
+            "person_detected": self.person_detected,
+            "person_count": self.person_count,
             "error": self.error
         }
 
@@ -207,7 +211,9 @@ class TouchWorkflowOrchestrator:
             yolo_result = process_image_for_person_detection(self.status.image_path)
             if yolo_result:
                 self.status.yolo_result = yolo_result.get('metadata', {})
-                logger.info(f"✓ YOLO complete - Person detected: {yolo_result['metadata'].get('person_detected', False)}")
+                self.status.person_detected = yolo_result['metadata'].get('person_detected', False)
+                self.status.person_count = yolo_result['metadata'].get('person_count', 0)
+                logger.info(f"✓ YOLO complete - Person detected: {self.status.person_detected}, Count: {self.status.person_count}")
             else:
                 logger.warning("⚠️  YOLO detection failed")
         except Exception as e:
