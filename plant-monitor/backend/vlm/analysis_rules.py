@@ -61,7 +61,7 @@ def check_reliability(
     # Rule 3: Cross-check with YOLO
     if yolo_metadata:
         yolo_person_detected = yolo_metadata.get("person_detected", False)
-        vlm_person_present = vlm_analysis.get("person_present", False)
+        vlm_person_present = vlm_analysis.get("person_present", vlm_analysis.get("person_detected", False))
         
         if yolo_person_detected != vlm_person_present:
             reliability["warnings"].append(
@@ -242,7 +242,7 @@ def get_analysis_summary(enhanced_analysis: Dict[str, Any]) -> str:
     recommendations = enhanced_analysis.get("recommendations", [])
     
     # Start with VLM summary
-    summary = analysis.get("summary", "No summary available")
+    summary = analysis.get("summary") or "No summary available"
     
     # Add reliability note
     confidence = reliability.get("confidence", "unknown")

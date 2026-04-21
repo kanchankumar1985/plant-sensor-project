@@ -16,7 +16,7 @@ load_dotenv()
 # Ollama configuration
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
 # Use a VISION-CAPABLE default model. Can be overridden via env OLLAMA_MODEL.
-# Examples: 'llava:7b' (recommended), 'llava-phi:3.8b', 'moondream:latest'
+# Examples: 'gemma3:4b' (installed), 'llava:7b', 'llava-phi:3.8b', 'moondream:latest'
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llava:7b') 
 OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '600'))  # seconds
 VLM_FORCE_JSON = os.getenv('VLM_FORCE_JSON', 'true').lower() in ('1', 'true', 'yes', 'y')
@@ -210,8 +210,17 @@ class OllamaClient:
 _client = None
 
 def get_ollama_client() -> OllamaClient:
-    """Get or create singleton Ollama client"""
+    """Get or create (and refresh if needed) singleton Ollama client.
+    If OLLAMA_MODEL or OLLAMA_HOST env changes at runtime, rebuild the client.
+    """
     global _client
-    if _client is None:
-        _client = OllamaClient()
+    # Always re-read env to allow dynamic changes without process restart
+    current_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)
+    current_model = os.getenv('OLLAMA_MODEL', OLLAMA_MODEL)
+    if (
+        _client is None or
+        getattr(_client, 'host', None) != current_host or
+        getattr(_client, 'model', None) != current_model
+    ):
+        _client = OllamaClient(host=current_host, model=current_model)
     return _client
