@@ -157,64 +157,6 @@ def insert_sensor_reading(conn, data):
         return None
 
 
-# Touch event counter
-touch_event_count = 0
-
-def check_yellow_leaves_and_pump(db_conn, serial_port):
-    """
-    Check latest snapshot for person detection and trigger pump if person detected
-    
-    Args:
-        db_conn: Database connection
-        serial_port: Serial port to send pump command
-    """
-    try:
-        cur = db_conn.cursor()
-        
-        # Get the most recent snapshot with person detection
-        query = """
-        SELECT person_detected, person_count, image_path
-        FROM plant_snapshots
-        ORDER BY time DESC
-        LIMIT 1
-        """
-        logger.info("🔍 Querying database for person detection...")
-        cur.execute(query)
-        result = cur.fetchone()
-        cur.close()
-        
-        if result:
-            person_detected, person_count, image_path = result
-            
-            logger.info(f"🔍 Person Detection Result:")
-            logger.info(f"   Person detected: {person_detected}")
-            logger.info(f"   Person count: {person_count}")
-            logger.info(f"   Image: {image_path}")
-            
-            # Check if person detected
-            if person_detected:
-                logger.info("")
-                logger.info("👤" * 20)
-                logger.info("PERSON DETECTED IN IMAGE!")
-                logger.info("💧 Triggering pump...")
-                logger.info("👤" * 20)
-                logger.info("")
-                
-                # Send command to ESP32 to turn on pump
-                logger.info(f"📤 Sending pump command to ESP32...")
-                serial_port.write(b"PUMP_ON_YELLOW_LEAVES\n")
-                serial_port.flush()
-                logger.info(f"✅ Pump command sent!")
-                time.sleep(0.1)
-            else:
-                logger.info("✅ No person detected - pump will not run")
-        else:
-            logger.warning("⚠️  No snapshot found")
-            
-    except Exception as e:
-        logger.error(f"Error checking person detection: {e}", exc_info=True)
-
-
 def check_temperature_threshold(temp):
     """Check if temperature exceeds threshold and trigger snapshot"""
     global last_snapshot_time
@@ -288,72 +230,21 @@ def main_loop(port=None):
                 
                 # Check for TOUCHED event (highest priority)
                 if line == "TOUCHED":
-                    global touch_event_count
-                    touch_event_count += 1
-                    
                     logger.info("")
                     logger.info("🖐️" * 20)
-                    logger.info(f"TOUCH EVENT DETECTED! (Count: {touch_event_count})")
+                    logger.info("TOUCH EVENT DETECTED!")
                     logger.info("🖐️" * 20)
                     logger.info("")
                     
-                    # Trigger TTS workflow
-                    try:
-                        handle_touch_event()
-                        logger.info("✅ TTS workflow triggered")
-                    except Exception as e:
-                        logger.error(f"TTS workflow failed: {e}")
+                    # Trigger workflow (includes TTS)
+                    handle_touch_event()
                     
-                    continue
-                
-                # Check for VLM analysis request
-                if line == "VLM_ANALYSIS_REQUESTED":
+                    # Log status
+                    time.sleep(0.5)
+                    orchestrator = get_orchestrator()
+                    status = orchestrator.get_status()
+                    logger.info(f"Workflow status: {status['status']}")
                     logger.info("")
-                    logger.info("📸" * 20)
-                    logger.info("PERSON DETECTION REQUESTED - CAPTURING IMAGE")
-                    logger.info("📸" * 20)
-                    logger.info("")
-                    
-                    # Capture image and check person detection
-                    try:
-                        from capture_with_vlm import capture_and_analyze
-                        db_connection = connect_database()
-                        if db_connection:
-                            success, yolo_result = capture_and_analyze(db_conn=db_connection)
-                            if success and yolo_result:
-                                # Person detection happens immediately during capture via YOLO
-                                person_detected = yolo_result['metadata']['person_detected']
-                                person_count = yolo_result['metadata']['person_count']
-                                
-                                logger.info("")
-                                logger.info("🔍" * 20)
-                                logger.info(f"YOLO DETECTION RESULT:")
-                                logger.info(f"   Person detected: {person_detected}")
-                                logger.info(f"   Person count: {person_count}")
-                                logger.info("🔍" * 20)
-                                logger.info("")
-                                
-                                # Trigger pump immediately if person detected
-                                if person_detected:
-                                    logger.info("")
-                                    logger.info("👤" * 20)
-                                    logger.info("PERSON DETECTED IN IMAGE!")
-                                    logger.info("💧 TRIGGERING PUMP...")
-                                    logger.info("👤" * 20)
-                                    logger.info("")
-                                    
-                                    # Send command to ESP32 to turn on pump
-                                    logger.info("📤 Sending pump command to ESP32...")
-                                    ser.write(b"PUMP_ON_YELLOW_LEAVES\n")
-                                    ser.flush()
-                                    logger.info("✅ Pump command sent!")
-                                else:
-                                    logger.info("✅ No person detected - pump will NOT run")
-                            
-                            db_connection.close()
-                    except Exception as e:
-                        logger.error(f"Image capture failed: {e}", exc_info=True)
-                    
                     continue
                 
                 # Try to parse as sensor data JSON
@@ -377,8 +268,8 @@ def main_loop(port=None):
                                   f"Humidity: {sensor_data['humidity_pct']:.2f}%, "
                                   f"LED: {led_str}")
                     
-                    # DISABLED: Auto temperature threshold snapshot
-                    # check_temperature_threshold(sensor_data['temperature_c'])
+                    # Check temperature threshold
+                    check_temperature_threshold(sensor_data['temperature_c'])
                     
                     # Update health tracking
                     global last_valid_read_ts

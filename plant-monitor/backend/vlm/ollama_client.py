@@ -16,7 +16,7 @@ load_dotenv()
 # Ollama configuration
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
 # Use a VISION-CAPABLE default model. Can be overridden via env OLLAMA_MODEL.
-# Examples: 'gemma3:4b' (installed), 'llava:7b', 'llava-phi:3.8b', 'moondream:latest'
+# Examples: 'llava:7b' (recommended), 'llava-phi:3.8b', 'moondream:latest'
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llava:7b') 
 OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '600'))  # seconds
 VLM_FORCE_JSON = os.getenv('VLM_FORCE_JSON', 'true').lower() in ('1', 'true', 'yes', 'y')
