@@ -482,7 +482,7 @@ def capture_and_analyze(
     db_conn: Optional[psycopg.Connection] = None,
     sensor_timestamp: Optional[datetime] = None,
     enable_vlm: bool = True
-) -> bool:
+) -> tuple[bool, Optional[Dict[str, Any]]]:
     """
     Complete pipeline: capture → YOLO → VLM → rules → database
     
@@ -493,7 +493,7 @@ def capture_and_analyze(
         enable_vlm: Whether to run VLM analysis (can disable for testing)
         
     Returns:
-        Success status
+        Tuple of (success status, yolo_result dict with person_detected)
     """
     logger.info("\n🌱 Starting capture with VLM analysis...")
     
@@ -502,14 +502,14 @@ def capture_and_analyze(
     if db_conn is None:
         db_conn = connect_database()
         if not db_conn:
-            return False
+            return False, None
         close_conn = True
     
     try:
         # Step 1: Capture webcam image
         image_filename = capture_webcam_image()
         if not image_filename:
-            return False
+            return False, None
         
         from capture_snapshot import IMAGES_DIR
         image_path = str(IMAGES_DIR / image_filename)
@@ -558,7 +558,7 @@ def capture_and_analyze(
         )
         
         if not snapshot_success:
-            return False
+            return False, None
         
         # Step 8: Analyze video if available (disabled by default)
         if video_filename and enable_vlm and _should_run_vlm() and VLM_VIDEO_ENABLED:
@@ -599,13 +599,13 @@ def capture_and_analyze(
         logger.info(f"   🌡️  Temp: {sensor_data['temperature_c']}°C")
         logger.info(f"   🤖 VLM status: {status}{(' - ' + reason) if reason else ''}")
         
-        return True
+        return True, yolo_result
         
     except Exception as e:
         logger.info(f"\n❌ Pipeline failed: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        return False, None
         
     finally:
         if close_conn:

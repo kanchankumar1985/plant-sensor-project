@@ -132,6 +132,7 @@ void loop() {
       // Control touch LED based on touch state
       if (currentTouchState == HIGH) {
         digitalWrite(TOUCH_LED_PIN, HIGH);  // Turn LED ON when touched
+        Serial.println("TOUCHED");  // For serial_touch_listener.py
         Serial.println("TOUCH_EVENT:TOUCHED");
         Serial.println("✓ Touched → LED ON");
       } else {

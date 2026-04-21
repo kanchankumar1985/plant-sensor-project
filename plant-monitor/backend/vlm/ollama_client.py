@@ -210,8 +210,17 @@ class OllamaClient:
 _client = None
 
 def get_ollama_client() -> OllamaClient:
-    """Get or create singleton Ollama client"""
+    """Get or create (and refresh if needed) singleton Ollama client.
+    If OLLAMA_MODEL or OLLAMA_HOST env changes at runtime, rebuild the client.
+    """
     global _client
-    if _client is None:
-        _client = OllamaClient()
+    # Always re-read env to allow dynamic changes without process restart
+    current_host = os.getenv('OLLAMA_HOST', OLLAMA_HOST)
+    current_model = os.getenv('OLLAMA_MODEL', OLLAMA_MODEL)
+    if (
+        _client is None or
+        getattr(_client, 'host', None) != current_host or
+        getattr(_client, 'model', None) != current_model
+    ):
+        _client = OllamaClient(host=current_host, model=current_model)
     return _client
