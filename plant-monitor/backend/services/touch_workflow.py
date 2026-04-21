@@ -164,9 +164,16 @@ class TouchWorkflowOrchestrator:
             logger.error(f"❌ Snapshot capture error: {e}")
     
     def _record_video(self):
-        """Step 2: Record video clip"""
+        """Step 2: Record video clip (optional - can be disabled for faster workflow)"""
         with self.lock:
             self.status.current_step = "recording_video"
+        
+        # Check if video recording is enabled via environment variable
+        enable_video = os.getenv('TOUCH_VIDEO_ENABLED', 'false').lower() in ('true', '1', 'yes')
+        
+        if not enable_video:
+            logger.info("⏭️  Step 2: Video recording disabled (set TOUCH_VIDEO_ENABLED=true to enable)")
+            return
         
         logger.info("🎥 Step 2: Recording video clip...")
         
@@ -175,7 +182,8 @@ class TouchWorkflowOrchestrator:
             return
         
         try:
-            video_filename = record_video_alert(duration=5, fps=10)
+            # Shorter video for faster workflow (3 seconds at 10 FPS)
+            video_filename = record_video_alert(duration=3, fps=10)
             if video_filename:
                 self.status.video_path = str(VIDEOS_DIR / video_filename)
                 logger.info(f"✓ Video saved: {video_filename}")
@@ -228,9 +236,15 @@ class TouchWorkflowOrchestrator:
             logger.warning("⚠️  Database not available - skipping")
             return
         
+        if not self.status.image_path:
+            logger.warning("⚠️  No image to save - skipping database")
+            return
+        
         try:
-            # Import capture_with_vlm to use its database insertion
-            from capture_with_vlm import capture_and_analyze, connect_database
+            # Import database functions
+            from capture_with_vlm import connect_database, insert_snapshot_quick
+            from capture_snapshot import get_latest_sensor_data
+            from pathlib import Path
             
             # Get sensor data
             conn = connect_database()
@@ -238,16 +252,48 @@ class TouchWorkflowOrchestrator:
                 logger.warning("⚠️  Database connection failed")
                 return
             
-            # The capture_and_analyze function will handle database insertion
-            # with VLM queuing
-            logger.info("✓ Database save queued (handled by capture pipeline)")
             try:
-                _ = capture_and_analyze(
-                    sensor_data=None,
-                    db_conn=conn,
-                    sensor_timestamp=None,
-                    enable_vlm=True,
-                )
+                # Get sensor data from database
+                sensor_data = get_latest_sensor_data(conn)
+                if not sensor_data:
+                    sensor_data = {
+                        'temperature_c': 0.0,
+                        'humidity_pct': 0.0,
+                        'led_state': False
+                    }
+                
+                # Prepare YOLO result
+                yolo_result = {
+                    'metadata': {
+                        'person_detected': self.status.person_detected,
+                        'person_count': self.status.person_count
+                    },
+                    'boxed_image_path': None
+                }
+                
+                # Extract just the filename from paths
+                image_filename = Path(self.status.image_path).name if self.status.image_path else None
+                video_filename = Path(self.status.video_path).name if self.status.video_path else None
+                
+                # Save to database with VLM queued status
+                if image_filename:
+                    success = insert_snapshot_quick(
+                        conn,
+                        image_filename,
+                        sensor_data,
+                        yolo_result,
+                        status='queued',  # Queue for VLM analysis
+                        reason=None,
+                        sensor_timestamp=None,
+                        video_filename=video_filename,
+                        model_name='llava:7b'
+                    )
+                    
+                    if success:
+                        logger.info("✓ Snapshot saved to database (VLM queued)")
+                    else:
+                        logger.warning("⚠️  Database save failed")
+                
             finally:
                 try:
                     conn.close()
@@ -255,7 +301,7 @@ class TouchWorkflowOrchestrator:
                     pass
             
         except Exception as e:
-            logger.error(f"❌ Database save error: {e}")
+            logger.error(f"❌ Database save error: {e}", exc_info=True)
     
     def get_status(self) -> Dict[str, Any]:
         """Get current workflow status"""
