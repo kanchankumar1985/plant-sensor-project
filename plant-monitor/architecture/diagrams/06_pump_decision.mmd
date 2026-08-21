@@ -1,0 +1,9 @@
+graph TD
+  A[YOLO result returned] --> B{person_detected}
+  B -->|True| C[Log Person detected]
+  C --> D[_trigger_pump with up to 6 retries]
+  D --> E[Serial write PUMP_ON_YELLOW_LEAVES]
+  E --> F[ESP32 pump ON for 2 seconds]
+  F --> G[60 second cooldown]
+  B -->|False| H[Log No person]
+  H --> I[Pump stays OFF]

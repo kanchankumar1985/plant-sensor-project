@@ -1,0 +1,19 @@
+graph TB
+  subgraph Hardware
+    A[ESP32 Dev Board]
+    B[Capacitive Touch Sensor GPIO4]
+    C[HDC302x Temperature/Humidity Sensor I2C]
+    D[Peristaltic Pump Relay]
+    E[Touch LED GPIO23 and Temperature LED GPIO18]
+  end
+  A -->|USB Serial /dev/cu.usbserial-0001| F[serial_unified_listener.py]
+  H[Webcam] -->|OpenCV VideoCapture| I[capture_snapshot.py / capture_video.py]
+  I -->|Image and Video Files| J[SD Card or backend/images and videos]
+  F -->|INSERT sensor_readings / touch_events| K[(TimescaleDB localhost:5433)]
+  L[YOLOv8n yolov8n.pt] -->|Person detection| I
+  M[Ollama VLM llava:7b] -->|REST /api/generate| N[vlm_worker.py / vlm_analyzer.py]
+  N -->|UPDATE plant_snapshots| K
+  O[FastAPI app.py on port 8000] -->|REST and static files| K
+  O -->|Serve images/videos| J
+  P[React plus Vite Dashboard on port 5173] -->|HTTP / REST| O
+  Q[macOS TTS say command] -->|Audio feedback| F

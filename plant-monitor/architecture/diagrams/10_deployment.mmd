@@ -1,0 +1,11 @@
+graph LR
+  A[start_all.sh] --> B[docker compose up timescaledb]
+  A --> C[uvicorn app:app --host 0.0.0.0 --port 8000]
+  A --> D[python3 serial_unified_listener.py]
+  A --> E[python3 vlm_worker.py]
+  A --> F[npm run dev in frontend]
+  G[start_backend.sh] --> C
+  H[start_unified_listener.sh] --> D
+  I[start_vlm_worker.sh] --> E
+  J[start_serial_reader.sh] --> D
+  K[start_touch_listener.sh] --> D

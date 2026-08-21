@@ -1,0 +1,20 @@
+graph LR
+  A[App.jsx] --> B[PlantHealthCard]
+  A --> C[PlantSnapshot]
+  A --> D[SnapshotGrid]
+  A --> E[PersonDetection]
+  A --> F[AIAnalysisCard]
+  A --> G[VideoAnalysisCard]
+  A --> H[AIStatusCard]
+  A --> I[TouchStatusCard]
+  A --> J[LogsPanel]
+  B --> K[FastAPI /api endpoints]
+  C --> K
+  D --> K
+  E --> K
+  F --> K
+  G --> K
+  H --> K
+  I --> K
+  J --> K
+  K --> L[TimescaleDB]

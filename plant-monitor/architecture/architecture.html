@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plant Sensor Project - Architecture Document</title>
+<style>
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  line-height: 1.6;
+  color: #222;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+h1, h2, h3, h4 { color: #1a472a; }
+h1 { font-size: 2em; border-bottom: 3px solid #2e7d32; padding-bottom: 10px; }
+h2 { font-size: 1.5em; margin-top: 2em; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+h3 { font-size: 1.2em; margin-top: 1.5em; }
+figure { margin: 1.5em 0; text-align: center; }
+figure img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; padding: 6px; background: #fff; }
+figcaption { font-size: 0.9em; color: #555; margin-top: 8px; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: #e8f5e9; }
+td { background: #fff; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+ul { margin-top: 0.5em; }
+.toc { background: #f0f8f1; padding: 15px; border-radius: 6px; }
+.toc ul { list-style: none; padding-left: 0; }
+.toc li { margin: 4px 0; }
+.cover { text-align: center; margin-bottom: 3em; }
+.cover p { color: #555; }
+.section { page-break-before: always; }
+.section:first-of-type { page-break-before: auto; }
+</style>
+</head>
+<body>
+<div class="cover">
+<h1>Plant Sensor Project - Architecture Document</h1>
+<p>Comprehensive system architecture, component connectivity, sequence and flow diagrams</p>
+<p><strong>Generated:</strong> 2026-08-20 23:50:05</p>
+<p><strong>Repository:</strong> /Users/kanchan/Plant Sensor Project</p>
+<p><strong>Document location:</strong> plant-monitor/architecture/</p>
+</div>
+
+<div class="toc section" id="toc">
+<h2>Table of Contents</h2>
+<ul>
+<li><a href="#executive-summary">1. Executive Summary</a></li>
+<li><a href="#idea">2. The Idea Behind the Project</a></li>
+<li><a href="#components">3. Component Inventory</a></li>
+<li><a href="#high-level">4. High-Level Architecture</a></li>
+<li><a href="#hardware">5. Hardware and Firmware Layer</a></li>
+<li><a href="#serial">6. Serial Communication and Data Ingestion</a></li>
+<li><a href="#monitoring">7. Continuous Monitoring and Alerts</a></li>
+<li><a href="#touch-workflow">8. Touch-Triggered Workflow</a></li>
+<li><a href="#pump-decision">9. Pump Decision Logic</a></li>
+<li><a href="#vlm">10. Computer Vision and AI Layer</a></li>
+<li><a href="#database">11. Database Schema</a></li>
+<li><a href="#frontend">12. React Frontend Dashboard</a></li>
+<li><a href="#logging">13. Logging and Storage</a></li>
+<li><a href="#deployment">14. Deployment and Startup</a></li>
+<li><a href="#errors">15. Error Handling and Resilience</a></li>
+<li><a href="#api">16. API Reference</a></li>
+<li><a href="#env">17. Environment Variables</a></li>
+<li><a href="#coverage">18. Cross-Check Coverage Matrix</a></li>
+<li><a href="#files">19. Key File Inventory</a></li>
+</ul>
+</div>
+
+<section class="section" id="executive-summary">
+
+<h2 id="executive-summary">1. Executive Summary</h2>
+<p>The Plant Sensor Project is an end-to-end Internet of Things (IoT) plant monitoring and interactive care system. It combines an ESP32 microcontroller, environmental sensors, a capacitive touch sensor, a peristaltic pump, computer vision, and a local Vision-Language Model (VLM) to monitor a plant and react to human touch.</p>
+<p>The core workflow is: the ESP32 continuously streams temperature and humidity data over USB serial. When a person touches the sensor, the system captures a webcam image, records a short video, runs YOLO person detection, optionally activates the pump when a person is detected, saves all media and metadata to a TimescaleDB time-series database, and queues a VLM analysis to describe the scene and plant health.</p>
+<p>A FastAPI backend exposes REST endpoints and static media, while a React plus Vite dashboard visualizes live sensor data, historical charts, snapshots, video clips, AI analysis, and system logs.</p>
+<p>All runtime data and logs can be stored on an externally mounted SD card to save laptop storage.</p>
+
+</section>
+<section class="section" id="idea">
+
+<h2 id="idea">2. The Idea Behind the Project</h2>
+<p>The project explores three ideas in one device:</p>
+<ul>
+<li><strong>Always-on plant telemetry:</strong> Track temperature and humidity around the plant over time and detect anomalies.</li>
+<li><strong>Human-plant interaction:</strong> Use a touch sensor as a trigger. When a person touches the plant area, the system responds with audio feedback, captures what the camera sees, and decides whether to run the pump.</li>
+<li><strong>Local AI reasoning:</strong> Instead of relying on the cloud, a local Ollama instance running the LLaVA vision model analyzes images and videos to detect people, describe clothing, assess plant health, identify yellowing, drooping, or wilting, and estimate image quality.</li>
+</ul>
+<p>In the current demonstration configuration, the pump is activated when a person is detected in the image. This is controlled by the <code>TouchWorkflowOrchestrator</code> and the command <code>PUMP_ON_YELLOW_LEAVES</code>. The same VLM pipeline can later be switched to trigger on plant conditions such as yellow leaves, making the system a closed-loop plant-care assistant.</p>
+
+</section>
+<section class="section" id="components">
+
+<h2 id="components">3. Component Inventory</h2>
+<table>
+<thead>
+<tr><th>Component</th><th>Type</th><th>Role</th><th>Key Path / Address</th></tr>
+</thead>
+<tbody>
+<tr><td>ESP32 Dev Board</td><td>Microcontroller</td><td>Reads sensors, drives pump and LEDs, streams serial data</td><td>/dev/cu.usbserial-0001, 115200 baud</td></tr>
+<tr><td>Capacitive touch sensor</td><td>Sensor</td><td>Detects human touch on GPIO4</td><td>touch_sensor.ino / touch_sensor_led_pump_unified.ino</td></tr>
+<tr><td>HDC302x</td><td>Sensor</td><td>Temperature and humidity over I2C (SDA GPIO21, SCL GPIO22)</td><td>plant-monitor/esp32/touch_sensor/touch_sensor.ino</td></tr>
+<tr><td>Peristaltic pump</td><td>Actuator</td><td>Moves water when PUMP_ON_YELLOW_LEAVES is received</td><td>Relay GPIO on ESP32</td></tr>
+<tr><td>Webcam</td><td>Camera</td><td>Provides images and video for analysis</td><td>OpenCV VideoCapture(0)</td></tr>
+<tr><td>Host computer</td><td>macOS / Linux / Windows</td><td>Runs Python backend, database, VLM, frontend</td><td>localhost</td></tr>
+<tr><td>TimescaleDB</td><td>Database</td><td>Time-series storage for sensors, snapshots, touch events, analysis</td><td>localhost:5433 / plantdb</td></tr>
+<tr><td>FastAPI</td><td>Backend API</td><td>REST API, static media, status endpoints</td><td>plant-monitor/backend/app.py port 8000</td></tr>
+<tr><td>Serial unified listener</td><td>Python service</td><td>Reads serial, parses data, triggers workflows, persists events</td><td>serial_unified_listener.py</td></tr>
+<tr><td>Touch workflow orchestrator</td><td>Python service</td><td>Coordinates TTS, capture, YOLO, pump, VLM queue, DB save</td><td>services/touch_workflow.py</td></tr>
+<tr><td>VLM worker</td><td>Python service</td><td>Background worker that claims queued snapshots and runs VLM</td><td>vlm_worker.py</td></tr>
+<tr><td>Ollama</td><td>Local ML server</td><td>Serves llava:7b for image and video reasoning</td><td>localhost:11434</td></tr>
+<tr><td>YOLOv8n</td><td>ML model</td><td>Lightweight person detection from Ultralytics</td><td>yolov8n.pt</td></tr>
+<tr><td>React dashboard</td><td>Frontend</td><td>User interface for live data, snapshots, video, AI status</td><td>port 5173</td></tr>
+<tr><td>SD card storage</td><td>Storage</td><td>Optional external images, videos, and logs path</td><td>/Volumes/SD-128GB/PlantMonitor</td></tr>
+</tbody>
+</table>
+
+</section>
+<section class="section" id="high-level">
+
+<h2 id="high-level">4. High-Level Architecture</h2>
+<p>The system is organized in four layers: hardware/firmware, data ingestion and orchestration, AI and storage, and the web dashboard. The hardware layer streams data over USB serial. The ingestion layer parses, persists, and triggers actions. The AI layer adds person detection and VLM reasoning. The storage layer keeps time-series and media metadata. The dashboard queries the REST API to present data to the user.</p>
+<figure><img src="diagrams/01_system_overview.svg" alt="High-level system architecture"><figcaption>Figure 1: High-level system architecture</figcaption></figure>
+
+</section>
+<section class="section" id="hardware">
+
+<h2 id="hardware">5. Hardware and Firmware Layer</h2>
+<p>The physical device is built around an ESP32 Dev Board. A capacitive touch sensor is wired to GPIO4 and debounced in firmware. The HDC302x temperature and humidity sensor connects to the default ESP32 I2C pins: SDA on GPIO21 and SCL on GPIO22. A peristaltic pump is driven through a relay pin, and two LEDs indicate touch and temperature states. The ESP32 communicates with the host over USB at 115200 baud.</p>
+<figure><img src="diagrams/02_hardware_layer.svg" alt="Hardware layer and wiring"><figcaption>Figure 2: Hardware layer and wiring</figcaption></figure>
+<p>The main production firmware is <code>plant-monitor/esp32/touch_sensor/touch_sensor.ino</code>. Additional prototype and test sketches live in the repository root, such as <code>touch_sensor/</code>, <code>touch_sensor_led_pump/</code>, <code>touch_sensor_led_pump_unified/</code>, <code>touch_led_control/</code>, and <code>touch_sensor_test/</code>. These were used to develop and isolate each subsystem before unification.</p>
+<p>The unified firmware outputs two kinds of serial traffic:</p>
+<ul>
+<li>Plain-text lines <code>TOUCHED</code> and <code>NOT_TOUCHED</code> for touch events.</li>
+<li>JSON objects with fields <code>device_id</code>, <code>temperature_c</code>, <code>humidity_pct</code>, and <code>led_state</code> for periodic environmental readings.</li>
+</ul>
+<p>The ESP32 also accepts the command <code>PUMP_ON_YELLOW_LEAVES</code> over the same serial link. On receipt, it turns the pump on for approximately 2 seconds and then enforces a 60-second cooldown before the next activation.</p>
+
+</section>
+<section class="section" id="serial">
+
+<h2 id="serial">6. Serial Communication and Data Ingestion</h2>
+<p>The serial layer is the bridge between the ESP32 and the rest of the system. The primary process is <code>serial_unified_listener.py</code>, which:</p>
+<ul>
+<li>Scans for an ESP32 on <code>/dev/cu.usbserial-0001</code> and reconnects automatically if the port drops.</li>
+<li>Reads each serial line, distinguishes touch text from JSON sensor data, and keeps a reference to the serial port for downstream pump commands.</li>
+<li>Calls <code>insert_touch_event()</code> to write <code>TOUCHED</code> and <code>NOT_TOUCHED</code> events into the <code>touch_events</code> table with a timestamp and device ID.</li>
+<li>Calls <code>parse_sensor_data()</code> and <code>insert_sensor_reading()</code> to store temperature, humidity, and LED state in <code>sensor_readings</code>.</li>
+<li>Checks temperature thresholds and can trigger optional video recording.</li>
+<li>On touch, calls <code>handle_touch_event()</code>, which delegates to the <code>TouchWorkflowOrchestrator</code> running in a background thread.</li>
+</ul>
+<p>Two older dedicated listeners, <code>serial_reader.py</code> and <code>serial_touch_listener.py</code>, still exist for testing and debugging but the unified listener is the preferred runtime path.</p>
+
+</section>
+<section class="section" id="monitoring">
+
+<h2 id="monitoring">7. Continuous Monitoring and Alerts</h2>
+<p>Outside of touch events, the system continuously monitors the plant environment. The ESP32 sends a JSON reading at a regular interval. The unified listener inserts it and can trigger a temperature alert when the configured threshold is reached. The temperature threshold and snapshot cooldown are controlled through environment variables such as <code>SNAPSHOT_COOLDOWN</code> and <code>VIDEO_ALERT_*</code> values.</p>
+<figure><img src="diagrams/03_continuous_monitoring.svg" alt="Continuous sensor monitoring and temperature alerts"><figcaption>Figure 3: Continuous sensor monitoring and temperature alerts</figcaption></figure>
+<p>React polls the <code>/api/readings/recent</code> and <code>/api/readings/latest</code> endpoints every few seconds, maps the data onto Recharts line charts, and displays the latest temperature, humidity, device ID, and last update time. The dashboard supports live mode with auto-refresh and custom time range queries.</p>
+
+</section>
+<section class="section" id="touch-workflow">
+
+<h2 id="touch-workflow">8. Touch-Triggered Workflow</h2>
+<p>Touch is the main human interaction. When the firmware reports <code>TOUCHED</code>, the unified listener stores the event and starts the <code>TouchWorkflowOrchestrator</code>. The orchestrator runs the following steps in a background thread so the serial listener never blocks:</p>
+<ol>
+<li><strong>Text-to-speech:</strong> The <code>tts_service.py</code> calls the macOS <code>say</code> command to announce "Sensor touched".</li>
+<li><strong>Snapshot:</strong> <code>capture_webcam_image()</code> opens the webcam, applies exposure and brightness settings, captures a frame, and saves a JPEG file.</li>
+<li><strong>Video clip:</strong> <code>record_video_alert(duration=3, fps=10)</code> records a short MP4 clip by first writing an MJPG AVI and then converting it with ffmpeg.</li>
+<li><strong>YOLO person detection:</strong> <code>detect_person.py</code> loads the <code>yolov8n.pt</code> model, detects people, draws bounding boxes, and saves a boxed image and JSON metadata.</li>
+<li><strong>Pump decision:</strong> If a person is detected, the orchestrator sends <code>PUMP_ON_YELLOW_LEAVES</code> through the serial port with retry logic. Otherwise the pump stays off.</li>
+<li><strong>Database insert:</strong> <code>capture_with_vlm.py</code> or the orchestrator calls <code>insert_snapshot_quick()</code> to write the snapshot row including image path, video path, YOLO metadata, and an <code>analysis_status</code> of <code>queued</code>.</li>
+</ol>
+<figure><img src="diagrams/04_touch_sequence.svg" alt="Touch-triggered end-to-end sequence"><figcaption>Figure 4: Touch-triggered end-to-end sequence</figcaption></figure>
+<figure><img src="diagrams/05_touch_workflow.svg" alt="Touch workflow internal flow"><figcaption>Figure 5: Touch workflow internal flow</figcaption></figure>
+
+</section>
+<section class="section" id="pump-decision">
+
+<h2 id="pump-decision">9. Pump Decision Logic</h2>
+<p>The pump is controlled by the result of YOLO detection. The <code>_trigger_pump()</code> method in <code>services/touch_workflow.py</code> checks that the serial port is open, retries up to six times if the port is transiently unavailable, and then sends the <code>PUMP_ON_YELLOW_LEAVES</code> command followed by a flush. The ESP32 firmware handles the actual 2-second pump run and 60-second cooldown.</p>
+<figure><img src="diagrams/06_pump_decision.svg" alt="Pump decision logic"><figcaption>Figure 6: Pump decision logic</figcaption></figure>
+<p>This behavior is currently configured for person-detection-based triggering as a demonstration. It can be extended to use VLM plant-health results by changing the condition that calls <code>_trigger_pump()</code>.</p>
+
+</section>
+<section class="section" id="vlm">
+
+<h2 id="vlm">10. Computer Vision and AI Layer</h2>
+<p>The AI layer has two stages: fast local object detection and slower vision-language reasoning.</p>
+<ul>
+<li><strong>YOLOv8n:</strong> The <code>detect_person.py</code> module uses the pretrained <code>yolov8n.pt</code> model from Ultralytics to detect people. It returns <code>person_detected</code>, <code>person_count</code>, a list of bounding boxes, and saves a boxed image for the UI.</li>
+<li><strong>Ollama VLM:</strong> The <code>vlm.ollama_client.py</code> module connects to a local Ollama server at <code>OLLAMA_HOST</code> (default <code>http://localhost:11434</code>) using the <code>llava:7b</code> model. It base64-encodes an image, posts to <code>/api/generate</code>, and requests JSON output when <code>VLM_FORCE_JSON</code> is enabled.</li>
+<li><strong>VLM analyzer:</strong> <code>vlm.vlm_analyzer.py</code> resizes the image for faster inference, selects a prompt, calls Ollama, and parses the returned JSON or extracts JSON from free text.</li>
+<li><strong>Analysis rules:</strong> <code>vlm.analysis_rules.py</code> normalizes the VLM output and computes an enhanced dictionary with flags such as <code>plant_visible</code>, <code>yellowing_visible</code>, <code>drooping_visible</code>, <code>wilting_visible</code>, <code>image_quality</code>, and reliability.</li>
+<li><strong>VLM worker:</strong> <code>vlm_worker.py</code> runs as a background daemon. It polls the <code>plant_snapshots</code> table for rows with <code>analysis_status = 'queued'</code>, claims the oldest one, runs <code>analyze_image_with_vlm()</code>, and updates the database with the results and <code>analysis_status = 'completed'</code> or <code>failed</code>.</li>
+</ul>
+<figure><img src="diagrams/07_vlm_pipeline.svg" alt="Vision-Language Model analysis pipeline"><figcaption>Figure 7: Vision-Language Model analysis pipeline</figcaption></figure>
+
+</section>
+<section class="section" id="database">
+
+<h2 id="database">11. Database Schema</h2>
+<p>TimescaleDB is used for time-series storage. The backend uses <code>psycopg</code> and a connection string from <code>DATABASE_URL</code>. The core schema is built from <code>schema.sql</code> and incremental migrations in <code>backend/migrations/</code>.</p>
+<figure><img src="diagrams/08_database_storage.svg" alt="Database storage flow"><figcaption>Figure 8: Database storage flow</figcaption></figure>
+<table>
+<thead><tr><th>Table</th><th>Purpose</th><th>Key columns</th></tr></thead>
+<tbody>
+<tr><td>sensor_readings</td><td>Time-series temperature and humidity</td><td>time, device_id, temperature_c, humidity_pct, led_state</td></tr>
+<tr><td>touch_events</td><td>Touch state transitions</td><td>id, timestamp, device_id, state</td></tr>
+<tr><td>plant_snapshots</td><td>Captured images, YOLO and VLM metadata</td><td>time, image_path, boxed_image_path, video_path, temperature_c, humidity_pct, led_state, person_detected, person_count, detection_metadata, vlm_summary, vlm_analysis, plant_visible, plant_occluded, plant_health_guess, yellowing_visible, drooping_visible, wilting_visible, image_quality, analysis_status, analysis_error, analysis_reliability, vlm_model, analyzed_at</td></tr>
+<tr><td>video_analysis</td><td>VLM analysis of recorded video clips</td><td>id, time, video_path, snapshot_id, vlm_summary, vlm_analysis, person_entered, person_left, person_stayed, plant_touched, plant_blocked, plant_visible_throughout, significant_motion, motion_description, event_type, frames_analyzed, frame_paths, analysis_status, vlm_model, analyzed_at</td></tr>
+</tbody>
+</table>
+<p>Helpful views include <code>latest_analyzed_snapshots</code>, <code>plant_health_alerts</code>, and <code>video_events</code>. The React dashboard and FastAPI endpoints query these tables and views.</p>
+
+</section>
+<section class="section" id="frontend">
+
+<h2 id="frontend">12. React Frontend Dashboard</h2>
+<p>The frontend is a React single-page application built with Vite. It fetches data from the FastAPI backend at <code>http://localhost:8000</code> and renders several focused cards.</p>
+<figure><img src="diagrams/09_ui_flow.svg" alt="React frontend component flow"><figcaption>Figure 9: React frontend component flow</figcaption></figure>
+<ul>
+<li><strong>App.jsx:</strong> Main layout, state for live/historical mode, date range picker, and fast-preset buttons (last 5 minutes, 15 minutes, 1 hour, today).</li>
+<li><strong>PlantHealthCard:</strong> Displays the latest VLM plant health assessment and warning flags (yellowing, drooping, wilting).</li>
+<li><strong>PlantSnapshot:</strong> Shows the most recent captured image with temperature and humidity overlay.</li>
+<li><strong>SnapshotGrid:</strong> Gallery of recent snapshots with thumbnails, video badges, and click-to-detail behavior.</li>
+<li><strong>PersonDetection:</strong> Highlights person detection metadata and boxed images.</li>
+<li><strong>AIAnalysisCard / VideoAnalysisCard:</strong> Display VLM image and video analysis summaries.</li>
+<li><strong>AIStatusCard:</strong> Shows Ollama connection, model name, queue status, and error counts.</li>
+<li><strong>TouchStatusCard:</strong> Displays the latest touch state and seconds since last touch.</li>
+<li><strong>LogsPanel:</strong> Auto-refreshing log viewer with level coloring, live indicator, and pause/resume controls.</li>
+</ul>
+<p>Recharts is used for the temperature and humidity line chart. The dashboard uses CSS-in-JS styling and fetches images, boxed images, and videos through the FastAPI static and video endpoints.</p>
+
+</section>
+<section class="section" id="logging">
+
+<h2 id="logging">13. Logging and Storage</h2>
+<p>Centralized logging is managed by <code>logging_config.py</code>. It creates rotating file handlers for each component and can mirror logs to the console. Log files are stored under the directory pointed to by <code>LOGS_DIR</code>. If an SD card is mounted at <code>/Volumes/SD-128GB/PlantMonitor</code> and writable, the start scripts set <code>LOGS_DIR</code>, <code>IMAGES_DIR</code>, and <code>VIDEOS_DIR</code> to that location. Otherwise they fall back to local <code>backend/logs</code>, <code>backend/images</code>, and <code>backend/videos</code>.</p>
+<p>The Logs API in <code>routes/logs.py</code> lets the frontend and operators retrieve the latest lines, list log files, read an entire file, and get aggregate statistics. Typical loggers include <code>app</code>, <code>api</code>, <code>serial_reader</code>, <code>camera</code>, and <code>vlm</code>.</p>
+
+</section>
+<section class="section" id="deployment">
+
+<h2 id="deployment">14. Deployment and Startup</h2>
+<p>All services can be started together with <code>start_all.sh</code> or individually through dedicated scripts.</p>
+<figure><img src="diagrams/10_deployment.svg" alt="Deployment and startup scripts"><figcaption>Figure 10: Deployment and startup scripts</figcaption></figure>
+<table>
+<thead><tr><th>Service</th><th>Script</th><th>Command / default port</th></tr></thead>
+<tbody>
+<tr><td>TimescaleDB</td><td>docker-compose.yml or start_all.sh</td><td>localhost:5433</td></tr>
+<tr><td>FastAPI</td><td>start_backend.sh, start_all.sh</td><td>0.0.0.0:8000</td></tr>
+<tr><td>Unified serial listener</td><td>start_unified_listener.sh</td><td>Reads /dev/cu.usbserial-0001</td></tr>
+<tr><td>VLM worker</td><td>start_vlm_worker.sh, start_all.sh</td><td>Polls DB and Ollama localhost:11434</td></tr>
+<tr><td>React dev server</td><td>npm run dev</td><td>localhost:5173</td></tr>
+</tbody>
+</table>
+<p>All startup scripts try to activate a local Python virtual environment from <code>.venv</code> or <code>venv</code> and prefer the SD card paths when the card is mounted and writable.</p>
+
+</section>
+<section class="section" id="errors">
+
+<h2 id="errors">15. Error Handling and Resilience</h2>
+<p>The system is designed to degrade gracefully when parts of the pipeline are unavailable.</p>
+<figure><img src="diagrams/11_error_handling.svg" alt="Error handling and resilience"><figcaption>Figure 11: Error handling and resilience</figcaption></figure>
+<ul>
+<li><strong>Serial port:</strong> The unified listener reconnects automatically if the port disappears, and the orchestrator retries pump commands up to six times when the port is transiently closed.</li>
+<li><strong>Database:</strong> Each DB operation is wrapped in error handling with rollback. Sensor insert failures are logged but do not crash the listener.</li>
+<li><strong>Camera:</strong> Capture failures are logged and skipped; the workflow continues to YOLO if an image is unavailable, then falls back to no detection.</li>
+<li><strong>YOLO:</strong> If the model or Ultralytics is not available, the module returns <code>person_detected = false</code> so the workflow can still complete.</li>
+<li><strong>VLM:</strong> If Ollama is offline, the worker marks jobs as failed with <code>analysis_error</code>. The system continues to capture and queue new snapshots for later analysis.</li>
+<li><strong>SD card:</strong> Scripts fall back to local directories when the SD card path is not present or not writable.</li>
+</ul>
+
+</section>
+<section class="section" id="api">
+
+<h2 id="api">16. API Reference</h2>
+<p>The FastAPI application in <code>app.py</code> plus the <code>touch_routes.py</code> and <code>routes/logs.py</code> routers expose the following endpoints. All times are returned as ISO 8601 strings. CORS is enabled for all origins to support the Vite dev server.</p>
+<table>
+<thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td>/health</td><td>Simple liveness check</td></tr>
+<tr><td>POST</td><td>/api/readings</td><td>Insert a sensor reading manually</td></tr>
+<tr><td>GET</td><td>/api/readings/latest</td><td>Latest sensor reading</td></tr>
+<tr><td>GET</td><td>/api/readings/recent?limit=N</td><td>Recent sensor readings</td></tr>
+<tr><td>GET</td><td>/api/readings/range</td><td>Readings in a time range</td></tr>
+<tr><td>GET</td><td>/api/snapshots/latest</td><td>Most recent snapshot</td></tr>
+<tr><td>GET</td><td>/api/snapshots/recent</td><td>List recent snapshots with image, boxed image, and video URLs</td></tr>
+<tr><td>GET</td><td>/api/snapshots/latest-detection</td><td>Latest snapshot with person detection metadata</td></tr>
+<tr><td>POST</td><td>/api/touch-event</td><td>Record a touch event</td></tr>
+<tr><td>GET</td><td>/api/touch-event/latest</td><td>Latest touch event</td></tr>
+<tr><td>GET</td><td>/api/touch-event/recent</td><td>Recent touch events</td></tr>
+<tr><td>GET</td><td>/api/touch-event/status</td><td>Current touch status</td></tr>
+<tr><td>GET</td><td>/api/analysis/latest-image</td><td>Latest snapshot with full VLM analysis</td></tr>
+<tr><td>GET</td><td>/api/analysis/latest-video</td><td>Latest video event analysis</td></tr>
+<tr><td>GET</td><td>/api/analysis/recent</td><td>Recent VLM analyses</td></tr>
+<tr><td>GET</td><td>/api/analysis/health-alerts</td><td>Snapshots with plant health concerns</td></tr>
+<tr><td>GET</td><td>/api/analysis/status</td><td>Ollama, model, and queue status</td></tr>
+<tr><td>POST</td><td>/api/analysis/run-latest</td><td>Placeholder to trigger VLM on latest snapshot</td></tr>
+<tr><td>GET</td><td>/api/logs/latest</td><td>Latest log lines</td></tr>
+<tr><td>GET</td><td>/api/logs/files</td><td>List log files</td></tr>
+<tr><td>GET</td><td>/api/logs/file/{filename}</td><td>Read a specific log file</td></tr>
+<tr><td>GET</td><td>/api/logs/stats</td><td>Aggregate log stats</td></tr>
+<tr><td>GET</td><td>/images/{path}</td><td>Static image files</td></tr>
+<tr><td>GET</td><td>/videos/{filename}</td><td>Video files with correct MIME type</td></tr>
+</tbody>
+</table>
+
+</section>
+<section class="section" id="env">
+
+<h2 id="env">17. Environment Variables</h2>
+<p>Behavior is configured through environment variables or a <code>.env</code> file in the <code>backend</code> directory. Defaults are used when a variable is not set.</p>
+<table>
+<thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>DATABASE_URL</td><td>postgresql://plantuser:plantpass@localhost:5433/plantdb</td><td>Connection string to TimescaleDB</td></tr>
+<tr><td>IMAGES_DIR</td><td>backend/images or SD card /images</td><td>Where snapshots are saved</td></tr>
+<tr><td>VIDEOS_DIR</td><td>backend/videos or SD card /videos</td><td>Where video clips are saved</td></tr>
+<tr><td>LOGS_DIR</td><td>backend/logs or SD card /logs</td><td>Where log files are written</td></tr>
+<tr><td>DEFAULT_DEVICE_ID</td><td>ESP32_PLANT_01</td><td>Fallback device ID for sensor/touch events</td></tr>
+<tr><td>CAMERA_AUTO_EXPOSURE</td><td>1</td><td>OpenCV auto exposure mode</td></tr>
+<tr><td>CAMERA_EXPOSURE</td><td>-6</td><td>Exposure level</td></tr>
+<tr><td>CAMERA_BRIGHTNESS</td><td>128</td><td>Brightness 0-255</td></tr>
+<tr><td>CAMERA_CONTRAST</td><td>32</td><td>Contrast 0-100</td></tr>
+<tr><td>CAMERA_WARMUP_TIME</td><td>0.5</td><td>Seconds to wait after setting camera</td></tr>
+<tr><td>IMAGE_JPEG_QUALITY</td><td>85</td><td>JPEG quality for snapshots</td></tr>
+<tr><td>SNAPSHOT_COOLDOWN</td><td>60</td><td>Minimum seconds between temperature snapshots</td></tr>
+<tr><td>VIDEO_ALERT_ENABLED</td><td>true</td><td>Enable video on temperature alert</td></tr>
+<tr><td>VIDEO_ALERT_DURATION</td><td>5</td><td>Seconds to record</td></tr>
+<tr><td>VIDEO_ALERT_FPS</td><td>25</td><td>Frames per second for videos</td></tr>
+<tr><td>TOUCH_VIDEO_ENABLED</td><td>true</td><td>Record a video on every touch event</td></tr>
+<tr><td>OLLAMA_HOST</td><td>http://localhost:11434</td><td>Ollama server URL</td></tr>
+<tr><td>OLLAMA_MODEL</td><td>llava:7b</td><td>Vision model name</td></tr>
+<tr><td>OLLAMA_TIMEOUT</td><td>600</td><td>Seconds to wait for Ollama</td></tr>
+<tr><td>VLM_ENABLED</td><td>true</td><td>Enable VLM processing</td></tr>
+<tr><td>VLM_COOLDOWN_SECONDS</td><td>600</td><td>Cooldown between VLM runs in worker</td></tr>
+<tr><td>VLM_POLL_INTERVAL</td><td>15</td><td>Worker polling interval</td></tr>
+<tr><td>VLM_MAX_IMAGE_WIDTH</td><td>640</td><td>Resize image width for VLM</td></tr>
+<tr><td>VLM_IMAGE_QUALITY</td><td>75</td><td>JPEG quality for VLM upload</td></tr>
+</tbody>
+</table>
+
+</section>
+<section class="section" id="coverage">
+
+<h2 id="coverage">18. Cross-Check Coverage Matrix</h2>
+<p>This matrix confirms that every major component is covered by at least one flow and that every flow is documented. An <strong>X</strong> means the component participates in the flow.</p>
+<table>
+<thead><tr><th>Component</th><th>Sensor Data Ingest</th><th>Touch Event</th><th>Pump Control</th><th>VLM Analysis</th><th>UI Query</th><th>Logging</th><th>Startup</th></tr></thead>
+<tbody>
+<tr><td>ESP32 / firmware</td><td>X</td><td>X</td><td>X</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Capacitive touch sensor</td><td></td><td>X</td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>HDC302x</td><td>X</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Webcam</td><td></td><td>X</td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>Peristaltic pump</td><td></td><td></td><td>X</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>serial_unified_listener.py</td><td>X</td><td>X</td><td></td><td></td><td></td><td>X</td><td>X</td></tr>
+<tr><td>TouchWorkflowOrchestrator</td><td></td><td>X</td><td>X</td><td>X</td><td></td><td>X</td><td></td></tr>
+<tr><td>capture_snapshot.py</td><td></td><td>X</td><td></td><td></td><td></td><td>X</td><td></td></tr>
+<tr><td>capture_video.py</td><td></td><td>X</td><td></td><td></td><td></td><td>X</td><td></td></tr>
+<tr><td>detect_person.py</td><td></td><td>X</td><td>X</td><td></td><td></td><td>X</td><td></td></tr>
+<tr><td>YOLOv8n</td><td></td><td>X</td><td>X</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>vlm_worker.py</td><td></td><td></td><td></td><td>X</td><td></td><td>X</td><td>X</td></tr>
+<tr><td>vlm_analyzer.py</td><td></td><td></td><td></td><td>X</td><td></td><td></td><td></td></tr>
+<tr><td>analysis_rules.py</td><td></td><td></td><td></td><td>X</td><td></td><td></td><td></td></tr>
+<tr><td>ollama_client.py</td><td></td><td></td><td></td><td>X</td><td></td><td></td><td></td></tr>
+<tr><td>Ollama / llava:7b</td><td></td><td></td><td></td><td>X</td><td></td><td></td><td></td></tr>
+<tr><td>TimescaleDB</td><td>X</td><td>X</td><td></td><td>X</td><td>X</td><td></td><td>X</td></tr>
+<tr><td>FastAPI / app.py</td><td></td><td>X</td><td></td><td></td><td>X</td><td></td><td>X</td></tr>
+<tr><td>touch_routes.py</td><td></td><td>X</td><td></td><td></td><td>X</td><td></td><td></td></tr>
+<tr><td>routes/logs.py</td><td></td><td></td><td></td><td></td><td></td><td>X</td><td></td></tr>
+<tr><td>React frontend</td><td></td><td></td><td></td><td></td><td>X</td><td></td><td></td></tr>
+<tr><td>SD card storage</td><td></td><td>X</td><td></td><td></td><td></td><td>X</td><td></td></tr>
+<tr><td>tts_service.py</td><td></td><td>X</td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>logging_config.py</td><td></td><td></td><td></td><td></td><td></td><td>X</td><td></td></tr>
+</tbody>
+</table>
+<p>Every component listed in the Component Inventory appears in at least one flow, and every system flow (sensor ingestion, touch event, pump control, VLM analysis, UI query, logging, startup) is represented by a diagram and a textual description.</p>
+
+</section>
+<section class="section" id="files">
+
+<h2 id="files">19. Key File Inventory</h2>
+<table>
+<thead><tr><th>File</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>plant-monitor/esp32/touch_sensor/touch_sensor.ino</td><td>Production ESP32 firmware</td></tr>
+<tr><td>plant-monitor/backend/app.py</td><td>FastAPI application and REST endpoints</td></tr>
+<tr><td>plant-monitor/backend/serial_unified_listener.py</td><td>Main serial reader and workflow trigger</td></tr>
+<tr><td>plant-monitor/backend/serial_reader.py</td><td>Original sensor-only serial reader</td></tr>
+<tr><td>plant-monitor/backend/serial_touch_listener.py</td><td>Dedicated touch-only serial listener</td></tr>
+<tr><td>plant-monitor/backend/services/touch_workflow.py</td><td>Touch pipeline orchestrator</td></tr>
+<tr><td>plant-monitor/backend/services/tts_service.py</td><td>macOS text-to-speech wrapper</td></tr>
+<tr><td>plant-monitor/backend/capture_snapshot.py</td><td>Webcam image capture</td></tr>
+<tr><td>plant-monitor/backend/capture_video.py</td><td>Webcam video recording and MP4 conversion</td></tr>
+<tr><td>plant-monitor/backend/capture_with_vlm.py</td><td>End-to-end capture, YOLO, and DB insert</td></tr>
+<tr><td>plant-monitor/backend/detect_person.py</td><td>YOLOv8n person detection</td></tr>
+<tr><td>plant-monitor/backend/vlm/vlm_analyzer.py</td><td>VLM image and video analysis</td></tr>
+<tr><td>plant-monitor/backend/vlm/ollama_client.py</td><td>Ollama REST client</td></tr>
+<tr><td>plant-monitor/backend/vlm/analysis_rules.py</td><td>VLM output normalization and rules</td></tr>
+<tr><td>plant-monitor/backend/vlm/prompt_templates.py</td><td>VLM prompts</td></tr>
+<tr><td>plant-monitor/backend/vlm/video_frame_sampler.py</td><td>Video frame extraction for VLM</td></tr>
+<tr><td>plant-monitor/backend/vlm_worker.py</td><td>Background VLM worker</td></tr>
+<tr><td>plant-monitor/backend/touch_routes.py</td><td>Touch API routes</td></tr>
+<tr><td>plant-monitor/backend/routes/logs.py</td><td>Logs API routes</td></tr>
+<tr><td>plant-monitor/backend/logging_config.py</td><td>Centralized logging setup</td></tr>
+<tr><td>plant-monitor/backend/schema.sql</td><td>Initial database schema</td></tr>
+<tr><td>plant-monitor/backend/migrations/00*.sql</td><td>Schema migrations for detection, video, VLM, and touch events</td></tr>
+<tr><td>plant-monitor/backend/start_all.sh</td><td>Starts database, backend, serial listener, VLM worker, and frontend</td></tr>
+<tr><td>plant-monitor/backend/start_backend.sh</td><td>Starts FastAPI with venv and SD path detection</td></tr>
+<tr><td>plant-monitor/backend/start_unified_listener.sh</td><td>Starts serial_unified_listener.py</td></tr>
+<tr><td>plant-monitor/backend/start_vlm_worker.sh</td><td>Starts vlm_worker.py</td></tr>
+<tr><td>plant-monitor/backend/docker-compose.yml</td><td>TimescaleDB container definition</td></tr>
+<tr><td>plant-monitor/frontend/src/App.jsx</td><td>React dashboard entry component</td></tr>
+<tr><td>plant-monitor/frontend/src/PlantHealthCard.jsx</td><td>Plant health display</td></tr>
+<tr><td>plant-monitor/frontend/src/PlantSnapshot.jsx</td><td>Latest snapshot display</td></tr>
+<tr><td>plant-monitor/frontend/src/SnapshotGrid.jsx</td><td>Snapshot gallery</td></tr>
+<tr><td>plant-monitor/frontend/src/PersonDetection.jsx</td><td>Person detection display</td></tr>
+<tr><td>plant-monitor/frontend/src/AIAnalysisCard.jsx</td><td>Image VLM analysis</td></tr>
+<tr><td>plant-monitor/frontend/src/VideoAnalysisCard.jsx</td><td>Video VLM analysis</td></tr>
+<tr><td>plant-monitor/frontend/src/AIStatusCard.jsx</td><td>Ollama and queue status</td></tr>
+<tr><td>plant-monitor/frontend/src/TouchStatusCard.jsx</td><td>Touch state card</td></tr>
+<tr><td>plant-monitor/frontend/src/components/LogsPanel.jsx</td><td>Live log viewer</td></tr>
+</tbody>
+</table>
+<p>Additional documentation, prototype sketches, and test programs are present in the repository root, including README.md, VLM_INTEGRATION_GUIDE.md, TOUCH_SENSOR_INTEGRATION_COMPLETE.md, and the firmware test folders.</p>
+
+</section>
+</body></html>

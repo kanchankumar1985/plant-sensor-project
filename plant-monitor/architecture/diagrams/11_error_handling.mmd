@@ -1,0 +1,14 @@
+graph TD
+  A[Touch workflow start] --> B{Camera available}
+  B -->|No| C[Log camera error]
+  B -->|Yes| D[Capture image]
+  D --> E{YOLO available}
+  E -->|No| F[Log YOLO error]
+  E -->|Yes| G[Run detection]
+  G --> H{Serial port open}
+  H -->|No| I[Retry _trigger_pump up to 6 attempts]
+  H -->|Yes| J[Send PUMP_ON_YELLOW_LEAVES]
+  G --> K{Database available}
+  K -->|No| L[Log database error]
+  K -->|Yes| M[Save snapshot and metadata]
+  M --> N[Queue VLM analysis]
