@@ -1,0 +1,35 @@
+sequenceDiagram
+    participant P as Person
+    participant E as ESP32
+    participant S as serial_unified_listener.py
+    participant T as TouchWorkflowOrchestrator
+    participant C as Webcam
+    participant Y as YOLOv8n
+    participant V as vlm_worker.py
+    participant DB as TimescaleDB
+    participant F as FastAPI
+    participant U as React UI
+    P->>E: Touch sensor
+    E->>S: Serial line TOUCHED
+    S->>S: insert_touch_event into touch_events
+    S->>T: handle_touch_event
+    T->>P: TTS says Sensor touched
+    T->>C: capture_webcam_image
+    C-->>T: plant_YYYYMMDD_HHMMSS.jpg
+    T->>C: record_video_alert duration 3s
+    C-->>T: alert_YYYYMMDD.mp4
+    T->>Y: process_image_for_person_detection
+    Y-->>T: person_detected, person_count, boxed image path
+    alt person_detected true
+        T->>E: Serial command PUMP_ON_YELLOW_LEAVES
+        E->>E: Pump ON 2 seconds then 60s cooldown
+    else person_detected false
+        T->>T: Skip pump
+    end
+    T->>DB: insert_snapshot_quick status queued
+    T->>DB: Set analysis_status queued
+    V->>DB: claim_next_job
+    V->>V: analyze_image_with_vlm
+    V->>DB: UPDATE plant_snapshots with vlm_summary and vlm_analysis
+    F->>DB: Query snapshots and analyses
+    U->>F: GET /api/snapshots/recent and /api/analysis/latest-image

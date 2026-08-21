@@ -140,17 +140,25 @@ void loop() {
     String command = Serial.readStringUntil('\n');
     command.trim();
     
+    // Debug: Log received command
+    Serial.print("📥 Received command: '");
+    Serial.print(command);
+    Serial.println("'");
+    
     if (command == "PUMP_ON_YELLOW_LEAVES") {
+      Serial.println("✓ Command matched: PUMP_ON_YELLOW_LEAVES");
       if (!pumpRunning && (currentMillis - lastPumpRunTime >= PUMP_COOLDOWN)) {
         runPump("YELLOW LEAVES DETECTED");
       } else if (pumpRunning) {
-        Serial.println("Pump already running");
+        Serial.println("❌ Pump already running");
       } else {
         unsigned long remainingCooldown = PUMP_COOLDOWN - (currentMillis - lastPumpRunTime);
-        Serial.print("Cooldown active (");
+        Serial.print("❌ Cooldown active (");
         Serial.print(remainingCooldown / 1000);
         Serial.println(" seconds remaining)");
       }
+    } else if (command.length() > 0) {
+      Serial.println("❌ Command NOT recognized");
     }
   }
   

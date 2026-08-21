@@ -1,0 +1,13 @@
+graph TD
+  A[plant_snapshots row with status queued] --> B[vlm_worker.py claim_next_job]
+  B --> C[analyze_image_with_vlm]
+  C --> D[_prepare_image_for_analysis resize and compress JPEG]
+  C --> E[OllamaClient.generate]
+  E --> F[Ollama REST endpoint /api/generate]
+  G[Local llava:7b model] --> F
+  F --> H[Raw text or JSON response]
+  H --> I[parse_json_from_response]
+  I --> J[analysis_rules.apply_analysis_rules]
+  J --> K[Enhanced analysis dictionary]
+  K --> L[UPDATE plant_snapshots vlm_summary vlm_analysis status]
+  L --> M[React AI Analysis and Plant Health cards]

@@ -1,0 +1,10 @@
+graph LR
+  A[Capacitive touch sensor signal pin] -->|GPIO4| B[ESP32 Dev Board]
+  C[HDC302x SDA] -->|GPIO21| B
+  D[HDC302x SCL] -->|GPIO22| B
+  E[HDC302x VCC 3.3V and GND] --> B
+  B -->|Pump relay GPIO| F[Peristaltic pump]
+  B -->|GPIO23| G[Touch LED]
+  B -->|GPIO18| H[Temperature LED]
+  B -->|USB cable 115200 baud| I[Host macOS / Linux / Windows]
+  I --> J[Python backend and FastAPI]

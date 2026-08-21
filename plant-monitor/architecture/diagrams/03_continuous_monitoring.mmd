@@ -1,0 +1,13 @@
+graph TD
+  A[ESP32 loop reads HDC302x] -->|JSON temperature and humidity| B[serial_unified_listener.py]
+  B --> C{Message type}
+  C -->|TOUCHED or NOT_TOUCHED| D[insert_touch_event]
+  C -->|Sensor JSON with device_id| E[parse_sensor_data]
+  E --> F[insert_sensor_reading]
+  F --> G[sensor_readings hypertable]
+  G --> H[FastAPI /api/readings/latest and /api/readings/recent]
+  H --> I[React live charts and metric cards]
+  F --> J{Temperature greater or equal 25C}
+  J -->|Yes| K[Temperature alert]
+  K --> L[capture_video_alert if VIDEO_ALERT_ENABLED true]
+  J -->|No| M[Continue monitoring loop]

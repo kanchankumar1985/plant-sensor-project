@@ -55,10 +55,12 @@ async def serve_video(filename: str):
     with open(video_path, 'rb') as f:
         video_data = f.read()
     
+    media_type = "video/mp4" if video_path.suffix.lower() == ".mp4" else "video/x-msvideo"
+
     # Return with proper headers for AVI/MJPEG playback
     return Response(
         content=video_data,
-        media_type="video/x-msvideo",
+        media_type=media_type,
         headers={
             "Accept-Ranges": "bytes",
             "Content-Length": str(len(video_data)),

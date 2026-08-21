@@ -55,6 +55,7 @@ last_snapshot_time = None
 
 # Sensor health tracking
 last_valid_read_ts = 0.0
+last_device_id = os.getenv('DEFAULT_DEVICE_ID', 'ESP32_PLANT_01')
 
 
 def find_esp32_port():
@@ -88,6 +89,28 @@ def connect_database():
         return conn
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
+        return None
+
+
+def insert_touch_event(conn, device_id: str, state: str):
+    try:
+        cur = conn.cursor()
+        insert_query = """
+        INSERT INTO touch_events (timestamp, device_id, state)
+        VALUES (NOW(), %s, %s)
+        RETURNING timestamp
+        """
+        cur.execute(insert_query, (device_id, state))
+        ts = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return ts
+    except Exception as e:
+        logger.error(f"Touch event insert failed: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         return None
 
 
@@ -218,6 +241,12 @@ def main_loop(port=None):
                         logger.warning(f"⏳ Retrying in {RECONNECT_DELAY} seconds...")
                         time.sleep(RECONNECT_DELAY)
                         continue
+
+                    try:
+                        orchestrator = get_orchestrator()
+                        orchestrator.set_serial_port(ser)
+                    except Exception:
+                        pass
             
             try:
                 # Read line from serial (blocking with timeout)
@@ -228,28 +257,43 @@ def main_loop(port=None):
                 
                 timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
                 
-                # Check for TOUCHED event (highest priority)
+                touch_state = None
                 if line == "TOUCHED":
+                    touch_state = "TOUCHED"
+                elif line == "NOT_TOUCHED":
+                    touch_state = "NOT_TOUCHED"
+
+                # Check for touch events (highest priority)
+                if touch_state:
                     logger.info("")
                     logger.info("🖐️" * 20)
                     logger.info("TOUCH EVENT DETECTED!")
                     logger.info("🖐️" * 20)
                     logger.info("")
+
+                    if db_conn:
+                        ts = insert_touch_event(db_conn, last_device_id, touch_state)
+                        if ts:
+                            logger.info(f"✓ Touch event saved: {last_device_id} state={touch_state}")
                     
                     # Set serial port in orchestrator for pump control
                     orchestrator = get_orchestrator()
                     orchestrator.set_serial_port(ser)
                     
-                    # Trigger workflow (non-blocking - pump will trigger when YOLO completes)
-                    handle_touch_event()
-                    logger.info("✅ Workflow started (pump will trigger when person detected)")
-                    logger.info("")
+                    if touch_state == "TOUCHED":
+                        # Trigger workflow (non-blocking - pump will trigger when YOLO completes)
+                        handle_touch_event()
+                        logger.info("✅ Workflow started (pump will trigger when person detected)")
+                        logger.info("")
                     continue
                 
                 # Try to parse as sensor data JSON
                 sensor_data = parse_sensor_data(line)
                 
                 if sensor_data:
+                    if sensor_data.get('device_id'):
+                        last_device_id = sensor_data['device_id']
+
                     # Determine LED state string
                     led_str = "ON" if sensor_data['led_state'] == 1 else "OFF"
                     
@@ -285,6 +329,11 @@ def main_loop(port=None):
             
             except serial.SerialException as e:
                 logger.error(f"❌ Serial read error: {e}")
+                try:
+                    orchestrator = get_orchestrator()
+                    orchestrator.set_serial_port(None)
+                except Exception:
+                    pass
                 if ser:
                     ser.close()
                 ser = None

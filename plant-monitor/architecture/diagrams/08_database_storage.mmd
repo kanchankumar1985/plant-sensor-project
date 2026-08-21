@@ -1,0 +1,10 @@
+graph LR
+  A[Image file] -->|image_path| B[plant_snapshots table]
+  C[Video file] -->|video_path| B
+  D[YOLO metadata JSON] -->|detection_metadata| B
+  E[Boxed image file] -->|boxed_image_path| B
+  F[sensor_readings table] -->|temperature_c, humidity_pct, led_state| B
+  G[VLM queue] -->|analysis_status queued| B
+  B --> H[vlm_worker]
+  H --> B
+  I[touch_events table] --> J[React TouchStatusCard]
