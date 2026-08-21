@@ -353,9 +353,24 @@ class TouchWorkflowOrchestrator:
             
             # Send pump command to ESP32
             logger.info("📤 Sending pump command to ESP32...")
-            self.serial_port.write(b"PUMP_ON_YELLOW_LEAVES\n")
-            self.serial_port.flush()
-            logger.info("✅ Pump command sent!")
+            for attempt in range(1, 7):
+                port = getattr(self, 'serial_port', None)
+                if port is None or not getattr(port, 'is_open', False):
+                    if attempt == 1:
+                        logger.warning("⚠️  Serial port not ready for pump command; waiting for reconnect...")
+                    time.sleep(0.5)
+                    continue
+
+                try:
+                    port.write(b"PUMP_ON_YELLOW_LEAVES\n")
+                    port.flush()
+                    logger.info("✅ Pump command sent!")
+                    break
+                except Exception as e:
+                    if attempt >= 6:
+                        raise
+                    logger.warning(f"⚠️  Pump command failed (attempt {attempt}/6): {e}")
+                    time.sleep(0.5)
         except Exception as e:
             logger.error(f"❌ Failed to send pump command: {e}")
     

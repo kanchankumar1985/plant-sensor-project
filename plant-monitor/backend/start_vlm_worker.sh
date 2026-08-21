@@ -3,7 +3,6 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-# Activate virtual environment if it exists
 if [ -d ".venv" ]; then
   source .venv/bin/activate
 elif [ -d "venv" ]; then
@@ -14,7 +13,6 @@ elif [ -d "../venv" ]; then
   source ../venv/bin/activate
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SD_ROOT="/Volumes/SD-128GB/PlantMonitor"
 
 if [ -d "$SD_ROOT" ] && [ -w "$SD_ROOT" ]; then
@@ -22,11 +20,11 @@ if [ -d "$SD_ROOT" ] && [ -w "$SD_ROOT" ]; then
   export VIDEOS_DIR="${VIDEOS_DIR:-$SD_ROOT/videos}"
   export LOGS_DIR="${LOGS_DIR:-$SD_ROOT/logs}"
 else
-  export IMAGES_DIR="${IMAGES_DIR:-$SCRIPT_DIR/images}"
-  export VIDEOS_DIR="${VIDEOS_DIR:-$SCRIPT_DIR/videos}"
-  export LOGS_DIR="${LOGS_DIR:-$SCRIPT_DIR/logs}"
+  export IMAGES_DIR="${IMAGES_DIR:-$(pwd)/images}"
+  export VIDEOS_DIR="${VIDEOS_DIR:-$(pwd)/videos}"
+  export LOGS_DIR="${LOGS_DIR:-$(pwd)/logs}"
 fi
 
 mkdir -p "$IMAGES_DIR" "$VIDEOS_DIR" "$LOGS_DIR"
 
-python -m uvicorn app:app --reload --host "${HOST:-0.0.0.0}" --port "${PORT:-8000}"
+python3 vlm_worker.py

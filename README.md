@@ -118,11 +118,32 @@ Firmware improvements:
   - app.py: Initializes logging, mounts routes, serves /images, /videos.
   - routes/logs.py: Logs API to fetch latest lines, list/read files, stats.
   - serial_reader.py: Serial parsing, DB inserts, snapshot/video triggers, health checks, comprehensive logging.
-  - capture_with_vlm.py / capture_video.py: Use centralized logger for camera and processing.
+  - services/touch_workflow.py: Handles touch-triggered capture/video/YOLO pipeline with non-blocking pump control.
+  - capture_with_vlm.py / capture_video.py: Use centralized logger for camera and processing, queue VLM tasks.
 - Firmware
-  - touch_sensor.ino: Robust HDC302x init (I2C scan, 0x44/0x45, retries), auto-recovery, emits touch-only JSON on sensor outage.
+  - touch_sensor.ino: Touch sensor + HDC302x; publishes JSON on touch events, pump/LED commands, and temperature readings.
 - Frontend
   - LogsPanel.jsx: 1s auto-refresh, color-coded levels, live indicator, auto-scroll to latest logs.
+
+### Touch-triggered Pump Workflow (Latest)
+
+- Touch sensor event /serial line `TOUCHED` triggers `services.touch_workflow.TouchWorkflowOrchestrator`.
+- Workflow steps:
+  1. Capture snapshot (camera + metadata).
+  2. Record short video (3s at 10 FPS by default; still saved to UI thumbnails).
+  3. Run YOLO person detection immediately on captured image.
+  4. If YOLO finds a person, pump command (`PUMP_ON_YELLOW_LEAVES`) is sent directly via the orchestrator to the ESP32; otherwise pump stays off.
+  5. Save snapshot + boxed image path + video path to the database and queue VLM analysis.
+- All touch workflows run in the background; the serial listener simply starts the workflow and logs the outcome.
+- Logs now include detailed pump-state decisions (Person detected/ not detected) so you can trace why the pump ran.
+- Video recording is enabled by default (`TOUCH_VIDEO_ENABLED=true`) but can be disabled for faster prototyping.
+- Pump activation has its own cooldown inside the ESP32 firmware, ensuring 2s runtime + 60s cooldown.
+
+### Pump Behavior
+
+- When YOLO detects `person_detected=True`, the pump is turned on for 2 seconds and water is moved between containers.
+- Pump command is sent only after YOLO completes so the serial listener never blocks waiting on computer vision.
+- Pump decision logs appear whenever YOLO completes.
 
 ## 💾 SD-Card Logging (Required)
 
